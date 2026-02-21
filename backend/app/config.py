@@ -1,5 +1,6 @@
 """Application configuration via environment variables."""
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +13,16 @@ class Settings(BaseSettings):
 
     # --- Database ---
     database_url: str = "postgresql+asyncpg://margo:margo_dev@localhost:5432/margo"
+
+    @field_validator("database_url")
+    @classmethod
+    def fix_database_scheme(cls, v: str) -> str:
+        """Railway injects postgresql:// — asyncpg needs postgresql+asyncpg://."""
+        if v.startswith("postgres://"):
+            v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif v.startswith("postgresql://"):
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
     db_pool_size: int = 20
     db_max_overflow: int = 10
 
