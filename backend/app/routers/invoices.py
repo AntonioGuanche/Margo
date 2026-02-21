@@ -1,12 +1,14 @@
 """Invoice API endpoints — upload, list, detail, confirm, delete."""
 
 import datetime as dt
+import logging
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.middleware.rate_limit import check_upload_rate_limit
 from app.models.ingredient import Ingredient
 from app.models.ingredient_alias import IngredientAlias
 from app.models.invoice import Invoice
@@ -29,7 +31,20 @@ from app.services.invoice_router import parse_invoice_file
 from app.services.matching import match_invoice_lines, save_alias
 from app.services.storage import save_upload
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+# --- Upload validation ---
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_MIME_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "application/pdf",
+    "application/xml",
+    "text/xml",
+}
 
 
 def _build_line_responses(match_results: list) -> list[dict]:
@@ -60,8 +75,43 @@ async def upload_invoice(
 
     Parses the file, matches lines to ingredients, and saves to DB.
     """
+    # Rate limit
+    check_upload_rate_limit(restaurant.id)
+
     if not file.filename:
-        raise HTTPException(status_code=422, detail="Le fichier doit avoir un nom.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Le fichier doit avoir un nom.",
+        )
+
+    # Validate MIME type
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_MIME_TYPES:
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+        valid_extensions = {"jpg", "jpeg", "png", "webp", "pdf", "xml"}
+        if ext not in valid_extensions:
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=f"Format non supporté : {content_type or ext}. Formats acceptés : JPEG, PNG, WebP, PDF, XML.",
+            )
+
+    # Validate file size
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        size_mb = len(content) / (1024 * 1024)
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Fichier trop volumineux ({size_mb:.1f} MB). Maximum : 10 MB.",
+        )
+    await file.seek(0)
+
+    logger.info(
+        "Invoice upload: %s (%s, %.1f KB)",
+        file.filename,
+        content_type,
+        len(content) / 1024,
+        extra={"restaurant_id": restaurant.id},
+    )
 
     # Save file
     file_path = await save_upload(file, subfolder="invoices")
@@ -180,7 +230,10 @@ async def get_invoice(
     )
     invoice = result.scalar_one_or_none()
     if not invoice:
-        raise HTTPException(status_code=404, detail="Facture introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Facture introuvable.",
+        )
 
     # Rebuild line responses from JSONB
     lines = []
@@ -230,10 +283,16 @@ async def confirm_invoice(
     )
     invoice = result.scalar_one_or_none()
     if not invoice:
-        raise HTTPException(status_code=404, detail="Facture introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Facture introuvable.",
+        )
 
     if invoice.status == "confirmed":
-        raise HTTPException(status_code=400, detail="Cette facture a déjà été confirmée.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette facture a déjà été confirmée.",
+        )
 
     prices_updated = 0
     ingredients_created = 0
@@ -318,6 +377,15 @@ async def confirm_invoice(
     invoice.status = "confirmed"
     await db.flush()
 
+    logger.info(
+        "Invoice %d confirmed: %d prices updated, %d ingredients created, %d recipes recalculated",
+        invoice_id,
+        prices_updated,
+        ingredients_created,
+        recipes_recalculated,
+        extra={"restaurant_id": restaurant.id},
+    )
+
     return InvoiceConfirmResponse(
         prices_updated=prices_updated,
         ingredients_created=ingredients_created,
@@ -341,11 +409,14 @@ async def delete_invoice(
     )
     invoice = result.scalar_one_or_none()
     if not invoice:
-        raise HTTPException(status_code=404, detail="Facture introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Facture introuvable.",
+        )
 
     if invoice.status == "confirmed":
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Impossible de supprimer une facture confirmée.",
         )
 

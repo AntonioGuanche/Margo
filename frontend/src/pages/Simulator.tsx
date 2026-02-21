@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { ArrowLeft, SlidersHorizontal, Check } from 'lucide-react';
 import { useRecipe } from '../hooks/useRecipes';
 import { useSimulate, useApplySimulation } from '../hooks/useSimulator';
@@ -118,8 +119,10 @@ export default function Simulator() {
       {
         onSuccess: () => {
           setApplied(true);
+          toast.success('Simulation appliquée ✅');
           setTimeout(() => navigate(`/recipes/${recipeId}`), 1500);
         },
+        onError: (err) => toast.error(err.message),
       },
     );
   }

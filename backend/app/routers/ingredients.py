@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_restaurant
 from app.models.ingredient import Ingredient
+from app.models.recipe import RecipeIngredient
 from app.models.restaurant import Restaurant
 from app.models.invoice import Invoice
 from app.models.price_history import IngredientPriceHistory
@@ -224,6 +225,21 @@ async def delete_ingredient(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Ingrédient introuvable",
+        )
+
+    # Check if ingredient is used in any recipe
+    usage_result = await db.execute(
+        select(func.count()).select_from(
+            select(RecipeIngredient).where(
+                RecipeIngredient.ingredient_id == ingredient_id
+            ).subquery()
+        )
+    )
+    usage_count = usage_result.scalar_one()
+    if usage_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cet ingrédient est utilisé dans {usage_count} recette{'s' if usage_count > 1 else ''}. Retire-le des recettes avant de le supprimer.",
         )
 
     await db.delete(ingredient)

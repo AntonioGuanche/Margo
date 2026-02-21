@@ -32,8 +32,21 @@ export async function apiClient<T>(
   }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Erreur serveur' }));
-    throw new Error(error.detail ?? 'Erreur serveur');
+    const error = await response.json().catch(() => ({ detail: undefined }));
+    const fallbackMessages: Record<number, string> = {
+      400: 'Données invalides',
+      403: 'Action non autorisée',
+      404: 'Ressource introuvable',
+      409: 'Conflit — cet élément existe déjà',
+      413: 'Fichier trop volumineux',
+      415: 'Format de fichier non supporté',
+      422: 'Données invalides',
+      429: 'Trop de requêtes — réessaie dans quelques secondes',
+      500: 'Oups, quelque chose a mal tourné. Réessaie.',
+      502: 'Service IA temporairement indisponible',
+    };
+    const message = error.detail ?? fallbackMessages[response.status] ?? 'Erreur serveur';
+    throw new Error(message);
   }
 
   if (response.status === 204) {

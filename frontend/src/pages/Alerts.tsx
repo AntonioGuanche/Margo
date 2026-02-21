@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck, TrendingUp, ChefHat } from 'lucide-react';
+import { ArrowLeft, Bell, CheckCheck, TrendingUp, ChefHat, PartyPopper } from 'lucide-react';
 import { useAlerts, useMarkAlertRead, useMarkAllRead } from '../hooks/useAlerts';
+import { SkeletonList } from '../components/Skeleton';
 import type { AlertItem } from '../hooks/useAlerts';
 
 function timeAgo(dateStr: string): string {
@@ -97,14 +98,29 @@ export default function Alerts() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-700" />
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-stone-900 flex items-center gap-2">
+            <Bell size={22} className="text-orange-700" />
+            Alertes
+          </h2>
+        </div>
+        <SkeletonList count={3} />
       </div>
     );
   }
 
   return (
     <div>
+      {/* Back button */}
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-1 text-stone-500 hover:text-stone-700 text-sm mb-4"
+      >
+        <ArrowLeft size={16} />
+        Retour
+      </button>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-stone-900 flex items-center gap-2">
@@ -125,9 +141,9 @@ export default function Alerts() {
 
       {!data?.items.length ? (
         <div className="bg-white rounded-xl border border-stone-200 p-8 text-center">
-          <Bell size={40} className="mx-auto text-stone-300 mb-3" />
-          <p className="text-stone-500">Aucune alerte pour le moment.</p>
-          <p className="text-sm text-stone-400 mt-1">
+          <PartyPopper size={40} className="mx-auto text-stone-300 mb-3" />
+          <p className="text-stone-600 font-medium mb-1">Aucune alerte. Tout va bien !</p>
+          <p className="text-sm text-stone-400">
             Les alertes apparaissent quand un prix fournisseur augmente significativement.
           </p>
         </div>

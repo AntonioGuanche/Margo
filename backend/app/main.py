@@ -10,6 +10,8 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import engine
+from app.logging_config import setup_logging
+from app.middleware.error_handler import register_error_handlers
 from fastapi.staticfiles import StaticFiles
 
 from app.routers.alerts import router as alerts_router
@@ -20,6 +22,9 @@ from app.routers.invoices import router as invoices_router
 from app.routers.recipes import router as recipes_router
 from app.routers.simulator import router as simulator_router
 from app.routers.webhooks import router as webhooks_router
+
+# Setup structured logging before anything else
+setup_logging()
 
 
 @asynccontextmanager
@@ -37,6 +42,9 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# --- Global error handlers ---
+register_error_handlers(app)
 
 # --- CORS ---
 allowed_origins: list[str] = [settings.frontend_url]

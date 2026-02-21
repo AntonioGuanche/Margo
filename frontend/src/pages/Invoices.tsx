@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { FileText, Plus, Clock, CheckCircle, Upload } from 'lucide-react';
 import { useInvoices } from '../hooks/useInvoices';
+import { SkeletonList } from '../components/Skeleton';
 import type { InvoiceListItem } from '../hooks/useInvoices';
 
 function StatusBadge({ status }: { status: string }) {
@@ -86,8 +87,14 @@ export default function Invoices() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-700" />
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-stone-900 flex items-center gap-2">
+            <FileText size={22} className="text-orange-700" />
+            Factures
+          </h2>
+        </div>
+        <SkeletonList count={4} />
       </div>
     );
   }
@@ -112,10 +119,9 @@ export default function Invoices() {
 
       {invoices.length === 0 ? (
         <div className="bg-white rounded-xl border border-stone-200 p-8 text-center">
-          <Upload size={48} className="mx-auto text-stone-300 mb-4" />
-          <p className="text-stone-500 mb-4">
-            Aucune facture importée
-          </p>
+          <Upload size={40} className="mx-auto text-stone-300 mb-3" />
+          <p className="text-stone-600 font-medium mb-1">Aucune facture importée</p>
+          <p className="text-sm text-stone-400 mb-4">Importe ta première facture.</p>
           <button
             onClick={() => navigate('/invoices/upload')}
             className="bg-orange-700 text-white px-6 py-3 rounded-xl font-medium hover:bg-orange-800 transition-colors"

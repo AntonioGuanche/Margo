@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { LayoutDashboard, ChefHat, TrendingUp, Camera, FileDown, AlertTriangle, SlidersHorizontal } from 'lucide-react';
 import { useDashboard } from '../hooks/useRecipes';
 import { useAlertCount, useAlerts } from '../hooks/useAlerts';
+import { SkeletonDashboard } from '../components/Skeleton';
 import type { RecipeListItem } from '../hooks/useRecipes';
 
 const STATUS_COLORS = {
@@ -66,11 +67,7 @@ export default function Dashboard() {
   const { data: alertsData } = useAlerts(false); // unread only for preview
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-700" />
-      </div>
-    );
+    return <SkeletonDashboard />;
   }
 
   if (!data || data.total_recipes === 0) {

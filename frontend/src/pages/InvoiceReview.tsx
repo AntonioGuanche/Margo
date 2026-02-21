@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FileCheck, Check, Plus, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { ArrowLeft, FileCheck, Check, Plus, Loader2 } from 'lucide-react';
 import { useInvoice, useConfirmInvoice } from '../hooks/useInvoices';
 import { useIngredients } from '../hooks/useIngredients';
 import type { InvoiceLineResponse } from '../hooks/useInvoices';
@@ -202,9 +203,11 @@ export default function InvoiceReview() {
       }));
 
     confirm.mutate(confirmLines, {
-      onSuccess: () => {
+      onSuccess: (data) => {
         setShowResult(true);
+        toast.success(`Facture confirmée — ${data.prices_updated} prix mis à jour ✅`);
       },
+      onError: (err) => toast.error(err.message),
     });
   };
 
@@ -264,6 +267,15 @@ export default function InvoiceReview() {
 
   return (
     <div>
+      {/* Back button */}
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-1 text-stone-500 hover:text-stone-700 text-sm mb-4"
+      >
+        <ArrowLeft size={16} />
+        Retour
+      </button>
+
       {/* Header */}
       <h2 className="text-xl font-semibold text-stone-900 mb-1 flex items-center gap-2">
         <FileCheck size={22} className="text-orange-700" />

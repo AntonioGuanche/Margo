@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { Plus, Search, Pencil, Trash2, UtensilsCrossed, TrendingUp } from 'lucide-react';
 import {
   useIngredients,
@@ -9,6 +10,8 @@ import {
 import type { Ingredient, UnitType } from '../hooks/useIngredients';
 import IngredientForm from '../components/IngredientForm';
 import PriceHistoryChart from '../components/PriceHistoryChart';
+import ConfirmModal from '../components/ConfirmModal';
+import { SkeletonList } from '../components/Skeleton';
 
 const UNIT_LABELS: Record<UnitType, string> = {
   g: 'g',
@@ -23,6 +26,7 @@ export default function Ingredients() {
   const [editing, setEditing] = useState<Ingredient | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [historyId, setHistoryId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState<Ingredient | null>(null);
 
   const { data, isLoading } = useIngredients(search || undefined);
   const createMutation = useCreateIngredient();
@@ -36,7 +40,11 @@ export default function Ingredients() {
     supplier_name?: string | null;
   }) {
     createMutation.mutate(formData, {
-      onSuccess: () => setShowForm(false),
+      onSuccess: () => {
+        setShowForm(false);
+        toast.success('Ingrédient ajouté ✅');
+      },
+      onError: (err) => toast.error(err.message),
     });
   }
 
@@ -49,13 +57,25 @@ export default function Ingredients() {
     if (!editing) return;
     updateMutation.mutate(
       { id: editing.id, data: formData },
-      { onSuccess: () => setEditing(null) },
+      {
+        onSuccess: () => {
+          setEditing(null);
+          toast.success('Ingrédient modifié ✅');
+        },
+        onError: (err) => toast.error(err.message),
+      },
     );
   }
 
-  function handleDelete(ingredient: Ingredient) {
-    if (!confirm(`Supprimer "${ingredient.name}" ?`)) return;
-    deleteMutation.mutate(ingredient.id);
+  function handleDelete() {
+    if (!deleting) return;
+    deleteMutation.mutate(deleting.id, {
+      onSuccess: () => {
+        setDeleting(null);
+        toast.success('Ingrédient supprimé');
+      },
+      onError: (err) => toast.error(err.message),
+    });
   }
 
   return (
@@ -92,15 +112,17 @@ export default function Ingredients() {
 
       {/* List */}
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-700" />
-        </div>
+        <SkeletonList count={5} />
       ) : !data?.items.length ? (
         <div className="bg-white rounded-xl border border-stone-200 p-8 text-center">
-          <p className="text-stone-500">
+          <UtensilsCrossed size={40} className="mx-auto text-stone-300 mb-3" />
+          <p className="text-stone-600 font-medium mb-1">
             {search
-              ? `Aucun ingrédient trouvé pour "${search}"`
-              : 'Aucun ingrédient. Commencez par en ajouter un !'}
+              ? `Aucun ingrédient trouvé pour « ${search} »`
+              : 'Aucun ingrédient'}
+          </p>
+          <p className="text-sm text-stone-400">
+            {search ? '' : "Ajoute-en un ou importe une facture."}
           </p>
         </div>
       ) : (
@@ -140,7 +162,7 @@ export default function Ingredients() {
                     <Pencil size={16} />
                   </button>
                   <button
-                    onClick={() => handleDelete(ingredient)}
+                    onClick={() => setDeleting(ingredient)}
                     className="p-2 text-stone-400 hover:text-red-600 transition-colors"
                     title="Supprimer"
                   >
@@ -180,6 +202,17 @@ export default function Ingredients() {
           onSubmit={handleUpdate}
           onClose={() => setEditing(null)}
           isLoading={updateMutation.isPending}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      {deleting && (
+        <ConfirmModal
+          title={`Supprimer « ${deleting.name} » ?`}
+          message="Cette action est irréversible. Les recettes utilisant cet ingrédient seront affectées."
+          onConfirm={handleDelete}
+          onCancel={() => setDeleting(null)}
+          isLoading={deleteMutation.isPending}
         />
       )}
     </div>

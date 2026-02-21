@@ -1,11 +1,14 @@
 """Onboarding routes — AI-powered menu extraction and batch recipe creation."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_restaurant
+from app.middleware.rate_limit import check_ai_rate_limit, check_upload_rate_limit
 from app.models.ingredient import Ingredient
 from app.models.recipe import Recipe, RecipeIngredient
 from app.models.restaurant import Restaurant
@@ -22,7 +25,11 @@ from app.services.costing import calculate_food_cost
 from app.services.onboarding_ai import extract_menu_from_image, suggest_ingredients_batch
 from app.services.storage import save_upload
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 @router.post("/extract-menu", response_model=MenuExtractionResponse)
@@ -31,11 +38,25 @@ async def extract_menu(
     restaurant: Restaurant = Depends(get_current_restaurant),
 ) -> MenuExtractionResponse:
     """Upload a menu image and extract dishes using AI."""
+    # Rate limits
+    check_upload_rate_limit(restaurant.id)
+    check_ai_rate_limit(restaurant.id)
+
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le fichier doit être une image (JPEG, PNG, etc.)",
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Le fichier doit être une image (JPEG, PNG, WebP).",
         )
+
+    # Validate file size
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        size_mb = len(content) / (1024 * 1024)
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Fichier trop volumineux ({size_mb:.1f} MB). Maximum : 10 MB.",
+        )
+    await file.seek(0)
 
     # Save the uploaded file
     image_path = await save_upload(file, subfolder="menus")
@@ -68,6 +89,7 @@ async def suggest_ingredients(
     restaurant: Restaurant = Depends(get_current_restaurant),
 ) -> SuggestIngredientsResponse:
     """Suggest ingredients for a list of dishes using AI."""
+    check_ai_rate_limit(restaurant.id)
     dishes_data = [
         {"name": d.name, "category": d.category}
         for d in request.dishes

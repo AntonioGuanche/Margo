@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, ChefHat } from 'lucide-react';
+import { Plus, Search, ChefHat, Camera } from 'lucide-react';
 import { useRecipes } from '../hooks/useRecipes';
+import { SkeletonList } from '../components/Skeleton';
 import type { RecipeListItem } from '../hooks/useRecipes';
 
 const STATUS_COLORS = {
@@ -74,16 +75,29 @@ export default function Recipes() {
 
       {/* List */}
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-700" />
-        </div>
+        <SkeletonList count={5} />
       ) : !data?.items.length ? (
         <div className="bg-white rounded-xl border border-stone-200 p-8 text-center">
-          <p className="text-stone-500">
+          <ChefHat size={40} className="mx-auto text-stone-300 mb-3" />
+          <p className="text-stone-600 font-medium mb-1">
             {search
-              ? `Aucune recette trouvée pour "${search}"`
-              : 'Aucune recette. Commencez par en ajouter une !'}
+              ? `Aucune recette trouvée pour « ${search} »`
+              : 'Aucune recette'}
           </p>
+          {!search && (
+            <>
+              <p className="text-sm text-stone-400 mb-4">
+                Commence par photographier ta carte !
+              </p>
+              <button
+                onClick={() => navigate('/onboarding')}
+                className="bg-orange-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-orange-800 transition-colors inline-flex items-center gap-2"
+              >
+                <Camera size={16} />
+                Photographier ma carte
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-2">

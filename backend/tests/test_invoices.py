@@ -55,11 +55,8 @@ async def test_upload_invalid_file(client, auth_headers, tmp_path):
             headers=auth_headers,
         )
 
-    # Image fallback — no crash
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["format"] == "image"
-    assert len(data["lines"]) == 0
+    # MIME type validation rejects text/plain
+    assert resp.status_code == 415
 
 
 async def test_list_invoices(client, auth_headers, xml_file_path):
@@ -349,7 +346,7 @@ async def test_delete_confirmed_fails(client, auth_headers, db_session, restaura
 
     # Try to delete
     resp = await client.delete(f"/api/invoices/{invoice_id}", headers=auth_headers)
-    assert resp.status_code == 400
+    assert resp.status_code == 403
 
 
 async def test_invoices_protected(client):

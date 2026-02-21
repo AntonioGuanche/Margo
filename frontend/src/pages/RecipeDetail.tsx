@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { ArrowLeft, Pencil, Trash2, SlidersHorizontal } from 'lucide-react';
 import { useRecipe, useDeleteRecipe } from '../hooks/useRecipes';
+import ConfirmModal from '../components/ConfirmModal';
+import { SkeletonList } from '../components/Skeleton';
 
 const STATUS_COLORS = {
   green: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-200' },
@@ -13,13 +17,10 @@ export default function RecipeDetail() {
   const navigate = useNavigate();
   const { data: recipe, isLoading } = useRecipe(id ? parseInt(id) : null);
   const deleteMutation = useDeleteRecipe();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-700" />
-      </div>
-    );
+    return <SkeletonList count={4} />;
   }
 
   if (!recipe) {
@@ -34,9 +35,13 @@ export default function RecipeDetail() {
   }
 
   function handleDelete() {
-    if (!recipe || !confirm(`Supprimer "${recipe.name}" ?`)) return;
+    if (!recipe) return;
     deleteMutation.mutate(recipe.id, {
-      onSuccess: () => navigate('/recipes'),
+      onSuccess: () => {
+        toast.success('Recette supprimée');
+        navigate('/recipes');
+      },
+      onError: (err) => toast.error(err.message),
     });
   }
 
@@ -78,7 +83,7 @@ export default function RecipeDetail() {
               <Pencil size={18} />
             </button>
             <button
-              onClick={handleDelete}
+              onClick={() => setShowDeleteConfirm(true)}
               className="p-2 text-stone-500 hover:text-red-600 transition-colors"
               title="Supprimer"
             >
@@ -145,6 +150,17 @@ export default function RecipeDetail() {
           </span>
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      {showDeleteConfirm && recipe && (
+        <ConfirmModal
+          title={`Supprimer « ${recipe.name} » ?`}
+          message="Cette action est irréversible."
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+          isLoading={deleteMutation.isPending}
+        />
+      )}
     </div>
   );
 }
