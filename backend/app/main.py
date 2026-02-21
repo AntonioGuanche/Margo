@@ -17,6 +17,7 @@ from app.routers.ingredients import router as ingredients_router
 from app.routers.onboarding import router as onboarding_router
 from app.routers.invoices import router as invoices_router
 from app.routers.recipes import router as recipes_router
+from app.routers.webhooks import router as webhooks_router
 
 
 @asynccontextmanager
@@ -57,6 +58,7 @@ app.include_router(ingredients_router, prefix="/api/ingredients", tags=["ingredi
 app.include_router(recipes_router, prefix="/api/recipes", tags=["recipes"])
 app.include_router(onboarding_router, prefix="/api/onboarding", tags=["onboarding"])
 app.include_router(invoices_router, prefix="/api/invoices", tags=["invoices"])
+app.include_router(webhooks_router, prefix="/webhooks", tags=["webhooks"])
 
 # --- Static files for uploads (dev only) ---
 if settings.environment == "development":

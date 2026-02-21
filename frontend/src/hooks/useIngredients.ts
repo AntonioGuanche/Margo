@@ -85,3 +85,28 @@ export function useDeleteIngredient() {
     },
   });
 }
+
+// --- Price history ---
+
+export interface PriceHistoryEntry {
+  price: number;
+  date: string;
+  invoice_id: number | null;
+  supplier_name: string | null;
+  created_at: string;
+}
+
+interface PriceHistoryResponse {
+  ingredient_name: string;
+  current_price: number | null;
+  history: PriceHistoryEntry[];
+}
+
+export function usePriceHistory(ingredientId: number | undefined) {
+  return useQuery<PriceHistoryResponse>({
+    queryKey: ['price-history', ingredientId],
+    queryFn: () =>
+      apiClient<PriceHistoryResponse>(`/api/ingredients/${ingredientId}/price-history`),
+    enabled: !!ingredientId,
+  });
+}

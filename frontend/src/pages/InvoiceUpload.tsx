@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, FileText, Camera, Loader2 } from 'lucide-react';
+import { Upload, FileText, Camera, Mail, Loader2 } from 'lucide-react';
 import { useUploadInvoice } from '../hooks/useInvoices';
 
 export default function InvoiceUpload() {
@@ -46,6 +46,23 @@ export default function InvoiceUpload() {
     [handleFile],
   );
 
+  // Loading state
+  if (upload.isPending) {
+    return (
+      <div>
+        <h2 className="text-xl font-semibold text-stone-900 mb-4 flex items-center gap-2">
+          <Upload size={22} className="text-orange-700" />
+          Importer une facture
+        </h2>
+        <div className="bg-white rounded-xl border border-stone-200 p-12 text-center">
+          <Loader2 size={48} className="text-orange-700 animate-spin mx-auto mb-4" />
+          <p className="text-stone-600 font-medium">Analyse de la facture en cours...</p>
+          <p className="text-sm text-stone-400 mt-1">Extraction des lignes (quelques secondes)</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <h2 className="text-xl font-semibold text-stone-900 mb-4 flex items-center gap-2">
@@ -53,55 +70,78 @@ export default function InvoiceUpload() {
         Importer une facture
       </h2>
 
-      {/* Drop zone */}
+      {/* Option 1: Drop zone (files) */}
       <div
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         className={`
-          border-2 border-dashed rounded-xl p-12 text-center transition-colors
+          border-2 border-dashed rounded-xl p-8 text-center transition-colors mb-4
           ${isDragging ? 'border-orange-500 bg-orange-50' : 'border-stone-300 bg-white'}
-          ${upload.isPending ? 'opacity-50 pointer-events-none' : ''}
         `}
       >
-        {upload.isPending ? (
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 size={48} className="text-orange-700 animate-spin" />
-            <p className="text-stone-600 font-medium">Analyse en cours...</p>
-            <p className="text-sm text-stone-400">Extraction des lignes de facture</p>
+        <FileText size={40} className="mx-auto text-stone-300 mb-3" />
+        <p className="text-stone-600 font-medium mb-1">
+          Glisse ta facture ici
+        </p>
+        <p className="text-sm text-stone-400 mb-4">
+          XML (UBL/Peppol), PDF, ou image
+        </p>
+
+        <label className="inline-flex items-center gap-2 bg-orange-700 text-white px-6 py-3 rounded-xl font-medium hover:bg-orange-800 transition-colors cursor-pointer">
+          <Upload size={18} />
+          Choisir un fichier
+          <input
+            type="file"
+            accept=".xml,.pdf,.jpg,.jpeg,.png,.webp"
+            onChange={handleInputChange}
+            className="hidden"
+          />
+        </label>
+      </div>
+
+      {/* Option 2: Camera (photo) */}
+      <div className="bg-white rounded-xl border border-stone-200 p-4 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center shrink-0">
+            <Camera size={20} className="text-orange-700" />
           </div>
-        ) : (
-          <>
-            <FileText size={48} className="mx-auto text-stone-300 mb-4" />
-            <p className="text-stone-600 font-medium mb-2">
-              Glisse ta facture ici (PDF ou XML)
-            </p>
-            <p className="text-sm text-stone-400 mb-6">
-              Formats acceptés : XML (UBL/Peppol), PDF
-            </p>
+          <div className="flex-1">
+            <p className="font-medium text-stone-900 text-sm">Scanner une facture</p>
+            <p className="text-xs text-stone-500">Prendre en photo avec la caméra</p>
+          </div>
+          <label className="bg-stone-100 text-stone-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-stone-200 transition-colors cursor-pointer">
+            Ouvrir
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleInputChange}
+              className="hidden"
+            />
+          </label>
+        </div>
+      </div>
 
-            <label className="inline-flex items-center gap-2 bg-orange-700 text-white px-6 py-3 rounded-xl font-medium hover:bg-orange-800 transition-colors cursor-pointer">
-              <Upload size={18} />
-              Choisir un fichier
-              <input
-                type="file"
-                accept=".xml,.pdf,.jpg,.jpeg,.png"
-                onChange={handleInputChange}
-                className="hidden"
-              />
-            </label>
-
-            <div className="mt-4">
-              <button
-                disabled
-                className="inline-flex items-center gap-2 text-sm text-stone-400 cursor-not-allowed"
-              >
-                <Camera size={16} />
-                Prendre en photo — Bientôt disponible
-              </button>
-            </div>
-          </>
-        )}
+      {/* Option 3: Email forwarding (info) */}
+      <div className="bg-white rounded-xl border border-stone-200 p-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
+            <Mail size={20} className="text-blue-700" />
+          </div>
+          <div className="flex-1">
+            <p className="font-medium text-stone-900 text-sm">Transférer par email</p>
+            <p className="text-xs text-stone-500 mt-0.5">
+              Transfère tes factures fournisseurs à :
+            </p>
+            <p className="text-sm font-mono bg-stone-50 rounded-lg px-3 py-2 mt-2 text-orange-700 select-all">
+              factures@margo.be
+            </p>
+            <p className="text-xs text-stone-400 mt-1">
+              Les pièces jointes (PDF, XML, images) seront importées automatiquement.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Error */}

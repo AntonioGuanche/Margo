@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Pencil, Trash2, UtensilsCrossed } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, UtensilsCrossed, TrendingUp } from 'lucide-react';
 import {
   useIngredients,
   useCreateIngredient,
@@ -8,6 +8,7 @@ import {
 } from '../hooks/useIngredients';
 import type { Ingredient, UnitType } from '../hooks/useIngredients';
 import IngredientForm from '../components/IngredientForm';
+import PriceHistoryChart from '../components/PriceHistoryChart';
 
 const UNIT_LABELS: Record<UnitType, string> = {
   g: 'g',
@@ -21,6 +22,7 @@ export default function Ingredients() {
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Ingredient | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [historyId, setHistoryId] = useState<number | null>(null);
 
   const { data, isLoading } = useIngredients(search || undefined);
   const createMutation = useCreateIngredient();
@@ -104,42 +106,56 @@ export default function Ingredients() {
       ) : (
         <div className="space-y-2">
           {data.items.map((ingredient) => (
-            <div
-              key={ingredient.id}
-              className="bg-white rounded-xl border border-stone-200 px-4 py-3 flex items-center justify-between"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="font-medium text-stone-900 truncate">
-                  {ingredient.name}
+            <div key={ingredient.id}>
+              <div className="bg-white rounded-xl border border-stone-200 px-4 py-3 flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-stone-900 truncate">
+                    {ingredient.name}
+                  </div>
+                  <div className="text-sm text-stone-500 flex gap-3 mt-0.5">
+                    <span>{UNIT_LABELS[ingredient.unit]}</span>
+                    {ingredient.current_price != null && (
+                      <span className="text-emerald-600 font-medium">
+                        {ingredient.current_price.toFixed(2)} €/{UNIT_LABELS[ingredient.unit]}
+                      </span>
+                    )}
+                    {ingredient.supplier_name && (
+                      <span className="truncate">{ingredient.supplier_name}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="text-sm text-stone-500 flex gap-3 mt-0.5">
-                  <span>{UNIT_LABELS[ingredient.unit]}</span>
-                  {ingredient.current_price != null && (
-                    <span className="text-emerald-600 font-medium">
-                      {ingredient.current_price.toFixed(2)} €/{UNIT_LABELS[ingredient.unit]}
-                    </span>
-                  )}
-                  {ingredient.supplier_name && (
-                    <span className="truncate">{ingredient.supplier_name}</span>
-                  )}
+                <div className="flex items-center gap-1 ml-2 shrink-0">
+                  <button
+                    onClick={() => setHistoryId(historyId === ingredient.id ? null : ingredient.id)}
+                    className={`p-2 transition-colors ${historyId === ingredient.id ? 'text-orange-700' : 'text-stone-400 hover:text-orange-700'}`}
+                    title="Historique des prix"
+                  >
+                    <TrendingUp size={16} />
+                  </button>
+                  <button
+                    onClick={() => setEditing(ingredient)}
+                    className="p-2 text-stone-400 hover:text-orange-700 transition-colors"
+                    title="Modifier"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(ingredient)}
+                    className="p-2 text-stone-400 hover:text-red-600 transition-colors"
+                    title="Supprimer"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-1 ml-2 shrink-0">
-                <button
-                  onClick={() => setEditing(ingredient)}
-                  className="p-2 text-stone-400 hover:text-orange-700 transition-colors"
-                  title="Modifier"
-                >
-                  <Pencil size={16} />
-                </button>
-                <button
-                  onClick={() => handleDelete(ingredient)}
-                  className="p-2 text-stone-400 hover:text-red-600 transition-colors"
-                  title="Supprimer"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
+              {historyId === ingredient.id && (
+                <div className="mt-1 mb-2">
+                  <PriceHistoryChart
+                    ingredientId={ingredient.id}
+                    onClose={() => setHistoryId(null)}
+                  />
+                </div>
+              )}
             </div>
           ))}
           <p className="text-sm text-stone-400 text-center pt-2">

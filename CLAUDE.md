@@ -102,4 +102,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 4 — Invoice Import XML/PDF. See @PLAN.md for full roadmap.
+Sprint 5 — OCR Photo + Email Forward. See @PLAN.md for full roadmap.

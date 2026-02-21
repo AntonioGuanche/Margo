@@ -44,6 +44,7 @@ class Settings(BaseSettings):
 
     # --- Email (Sprint 5+) ---
     resend_api_key: str = ""
+    inbound_email_webhook_secret: str = ""
 
     # --- Stripe (Sprint 8) ---
     stripe_secret_key: str = ""

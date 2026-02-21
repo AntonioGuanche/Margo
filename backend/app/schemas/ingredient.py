@@ -1,6 +1,6 @@
 """Ingredient request/response schemas."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -37,3 +37,21 @@ class IngredientResponse(BaseModel):
 class IngredientListResponse(BaseModel):
     items: list[IngredientResponse]
     total: int
+
+
+# --- Price history ---
+
+class PriceHistoryEntry(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    price: float
+    date: date
+    invoice_id: int | None = None
+    supplier_name: str | None = None
+    created_at: datetime
+
+
+class PriceHistoryResponse(BaseModel):
+    ingredient_name: str
+    current_price: float | None
+    history: list[PriceHistoryEntry]

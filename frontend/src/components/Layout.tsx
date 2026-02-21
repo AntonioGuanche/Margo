@@ -1,10 +1,13 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { UtensilsCrossed, LayoutDashboard, ChefHat, FileText, LogOut } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useInvoices } from '../hooks/useInvoices';
 
 export default function Layout() {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { data: invoicesData } = useInvoices('pending_review');
+  const pendingCount = invoicesData?.total ?? 0;
 
   function handleLogout() {
     logout();
@@ -53,10 +56,17 @@ export default function Layout() {
         <NavLink
           to="/invoices"
           className={({ isActive }) =>
-            `flex flex-col items-center text-xs ${isActive ? 'text-orange-700' : 'text-stone-400'}`
+            `flex flex-col items-center text-xs relative ${isActive ? 'text-orange-700' : 'text-stone-400'}`
           }
         >
-          <FileText size={20} />
+          <div className="relative">
+            <FileText size={20} />
+            {pendingCount > 0 && (
+              <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {pendingCount > 9 ? '9+' : pendingCount}
+              </span>
+            )}
+          </div>
           <span>Factures</span>
         </NavLink>
         <NavLink

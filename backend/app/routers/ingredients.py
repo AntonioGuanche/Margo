@@ -9,11 +9,15 @@ from app.database import get_db
 from app.dependencies import get_current_restaurant
 from app.models.ingredient import Ingredient
 from app.models.restaurant import Restaurant
+from app.models.invoice import Invoice
+from app.models.price_history import IngredientPriceHistory
 from app.schemas.ingredient import (
     IngredientCreate,
     IngredientListResponse,
     IngredientResponse,
     IngredientUpdate,
+    PriceHistoryEntry,
+    PriceHistoryResponse,
 )
 from app.services.costing import recalculate_recipes_for_ingredient
 
@@ -150,6 +154,55 @@ async def update_ingredient(
 
     await db.refresh(ingredient)
     return IngredientResponse.model_validate(ingredient)
+
+
+@router.get("/{ingredient_id}/price-history", response_model=PriceHistoryResponse)
+async def get_price_history(
+    ingredient_id: int,
+    restaurant: Restaurant = Depends(get_current_restaurant),
+    db: AsyncSession = Depends(get_db),
+) -> PriceHistoryResponse:
+    """Get price history for an ingredient, sorted by date desc."""
+    result = await db.execute(
+        select(Ingredient).where(
+            Ingredient.id == ingredient_id,
+            Ingredient.restaurant_id == restaurant.id,
+        )
+    )
+    ingredient = result.scalar_one_or_none()
+
+    if ingredient is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ingrédient introuvable",
+        )
+
+    # Query price history with invoice join for supplier_name
+    from sqlalchemy.orm import selectinload
+    history_result = await db.execute(
+        select(IngredientPriceHistory)
+        .options(selectinload(IngredientPriceHistory.invoice))
+        .where(IngredientPriceHistory.ingredient_id == ingredient_id)
+        .order_by(IngredientPriceHistory.date.desc())
+    )
+    history_entries = history_result.scalars().all()
+
+    history = [
+        PriceHistoryEntry(
+            price=entry.price,
+            date=entry.date,
+            invoice_id=entry.invoice_id,
+            supplier_name=entry.invoice.supplier_name if entry.invoice else None,
+            created_at=entry.created_at,
+        )
+        for entry in history_entries
+    ]
+
+    return PriceHistoryResponse(
+        ingredient_name=ingredient.name,
+        current_price=ingredient.current_price,
+        history=history,
+    )
 
 
 @router.delete("/{ingredient_id}", status_code=status.HTTP_204_NO_CONTENT)
