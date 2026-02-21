@@ -15,6 +15,7 @@ from app.schemas.ingredient import (
     IngredientResponse,
     IngredientUpdate,
 )
+from app.services.costing import recalculate_recipes_for_ingredient
 
 router = APIRouter()
 
@@ -142,6 +143,10 @@ async def update_ingredient(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Un ingrédient nommé '{data.name}' existe déjà",
         )
+
+    # Cascade recalculate all recipes using this ingredient
+    if price_changed:
+        await recalculate_recipes_for_ingredient(db, ingredient_id)
 
     await db.refresh(ingredient)
     return IngredientResponse.model_validate(ingredient)

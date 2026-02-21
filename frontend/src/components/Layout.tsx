@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { UtensilsCrossed, LayoutDashboard, LogOut } from 'lucide-react';
+import { UtensilsCrossed, LayoutDashboard, ChefHat, LogOut } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Layout() {
@@ -40,6 +40,15 @@ export default function Layout() {
         >
           <LayoutDashboard size={20} />
           <span>Dashboard</span>
+        </NavLink>
+        <NavLink
+          to="/recipes"
+          className={({ isActive }) =>
+            `flex flex-col items-center text-xs ${isActive ? 'text-orange-700' : 'text-stone-400'}`
+          }
+        >
+          <ChefHat size={20} />
+          <span>Recettes</span>
         </NavLink>
         <NavLink
           to="/ingredients"

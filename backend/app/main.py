@@ -12,6 +12,7 @@ from app.config import settings
 from app.database import engine
 from app.routers.auth import router as auth_router
 from app.routers.ingredients import router as ingredients_router
+from app.routers.recipes import router as recipes_router
 
 
 @asynccontextmanager
@@ -49,6 +50,7 @@ app.add_middleware(
 # --- Routers ---
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(ingredients_router, prefix="/api/ingredients", tags=["ingredients"])
+app.include_router(recipes_router, prefix="/api/recipes", tags=["recipes"])
 
 
 # --- Health check ---
