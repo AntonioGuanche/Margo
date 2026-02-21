@@ -10,6 +10,8 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import engine
+from app.routers.auth import router as auth_router
+from app.routers.ingredients import router as ingredients_router
 
 
 @asynccontextmanager
@@ -43,6 +45,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- Routers ---
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(ingredients_router, prefix="/api/ingredients", tags=["ingredients"])
 
 
 # --- Health check ---
