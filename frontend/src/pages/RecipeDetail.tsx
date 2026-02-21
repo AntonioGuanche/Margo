@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, SlidersHorizontal } from 'lucide-react';
 import { useRecipe, useDeleteRecipe } from '../hooks/useRecipes';
 
 const STATUS_COLORS = {
@@ -63,6 +63,13 @@ export default function RecipeDetail() {
             )}
           </div>
           <div className="flex gap-1">
+            <button
+              onClick={() => navigate(`/recipes/${recipe.id}/simulate`)}
+              className="p-2 text-stone-500 hover:text-orange-700 transition-colors"
+              title="Simuler"
+            >
+              <SlidersHorizontal size={18} />
+            </button>
             <button
               onClick={() => navigate(`/recipes/${recipe.id}/edit`)}
               className="p-2 text-stone-500 hover:text-orange-700 transition-colors"

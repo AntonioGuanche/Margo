@@ -1,13 +1,16 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { UtensilsCrossed, LayoutDashboard, ChefHat, FileText, LogOut } from 'lucide-react';
+import { UtensilsCrossed, LayoutDashboard, ChefHat, FileText, LogOut, Bell } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useInvoices } from '../hooks/useInvoices';
+import { useAlertCount } from '../hooks/useAlerts';
 
 export default function Layout() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const { data: invoicesData } = useInvoices('pending_review');
   const pendingCount = invoicesData?.total ?? 0;
+  const { data: alertCount } = useAlertCount();
+  const unreadAlerts = alertCount?.unread_count ?? 0;
 
   function handleLogout() {
     logout();
@@ -19,13 +22,27 @@ export default function Layout() {
       {/* Header */}
       <header className="bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between">
         <h1 className="text-xl font-bold text-orange-700">Margó</h1>
-        <button
-          onClick={handleLogout}
-          className="text-stone-500 hover:text-stone-700 p-2"
-          title="Déconnexion"
-        >
-          <LogOut size={20} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => navigate('/alerts')}
+            className="relative text-stone-500 hover:text-stone-700 p-2"
+            title="Alertes"
+          >
+            <Bell size={20} />
+            {unreadAlerts > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {unreadAlerts > 9 ? '9+' : unreadAlerts}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={handleLogout}
+            className="text-stone-500 hover:text-stone-700 p-2"
+            title="Déconnexion"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
       </header>
 
       {/* Content */}

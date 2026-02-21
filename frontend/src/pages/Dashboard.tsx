@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ChefHat, TrendingUp, Camera, FileDown } from 'lucide-react';
+import { LayoutDashboard, ChefHat, TrendingUp, Camera, FileDown, AlertTriangle, SlidersHorizontal } from 'lucide-react';
 import { useDashboard } from '../hooks/useRecipes';
+import { useAlertCount, useAlerts } from '../hooks/useAlerts';
 import type { RecipeListItem } from '../hooks/useRecipes';
 
 const STATUS_COLORS = {
@@ -19,34 +20,50 @@ function StatusBadge({ status }: { status: 'green' | 'orange' | 'red' }) {
   );
 }
 
-function RecipeRow({ recipe, onClick }: { recipe: RecipeListItem; onClick: () => void }) {
+function RecipeRow({ recipe, onClickRecipe, onSimulate }: {
+  recipe: RecipeListItem;
+  onClickRecipe: () => void;
+  onSimulate: () => void;
+}) {
+  const showSimulate = recipe.margin_status === 'orange' || recipe.margin_status === 'red';
   return (
-    <button
-      onClick={onClick}
-      className="w-full bg-white rounded-xl border border-stone-200 px-4 py-3 flex items-center justify-between hover:border-stone-300 transition-colors text-left"
-    >
-      <div className="min-w-0 flex-1">
+    <div className="bg-white rounded-xl border border-stone-200 px-4 py-3 flex items-center justify-between">
+      <button
+        onClick={onClickRecipe}
+        className="min-w-0 flex-1 text-left hover:opacity-80 transition-opacity"
+      >
         <div className="font-medium text-stone-900 truncate">{recipe.name}</div>
         <div className="text-sm text-stone-500 flex gap-3 mt-0.5">
           {recipe.category && <span>{recipe.category}</span>}
           <span>{recipe.selling_price.toFixed(2)} €</span>
         </div>
-      </div>
-      <div className="flex items-center gap-3 ml-2 shrink-0">
+      </button>
+      <div className="flex items-center gap-2 ml-2 shrink-0">
         {recipe.food_cost_percent != null && (
           <span className={`text-sm font-semibold ${STATUS_COLORS[recipe.margin_status].text}`}>
             {recipe.food_cost_percent.toFixed(1)}%
           </span>
         )}
         <StatusBadge status={recipe.margin_status} />
+        {showSimulate && (
+          <button
+            onClick={onSimulate}
+            className="p-1.5 text-stone-400 hover:text-orange-700 transition-colors"
+            title="Simuler"
+          >
+            <SlidersHorizontal size={16} />
+          </button>
+        )}
       </div>
-    </button>
+    </div>
   );
 }
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { data, isLoading } = useDashboard();
+  const { data: alertCount } = useAlertCount();
+  const { data: alertsData } = useAlerts(false); // unread only for preview
 
   if (isLoading) {
     return (
@@ -95,12 +112,32 @@ export default function Dashboard() {
           ? 'orange'
           : 'red';
 
+  const unreadCount = alertCount?.unread_count ?? 0;
+  const latestAlert = alertsData?.items?.[0];
+
   return (
     <div>
       <h2 className="text-xl font-semibold text-stone-900 mb-4 flex items-center gap-2">
         <LayoutDashboard size={22} className="text-orange-700" />
         Dashboard
       </h2>
+
+      {/* Alert banner */}
+      {unreadCount > 0 && latestAlert && (
+        <button
+          onClick={() => navigate('/alerts')}
+          className="w-full bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-amber-100 transition-colors mb-4 text-left"
+        >
+          <AlertTriangle size={20} className="text-amber-600 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-amber-800">
+              {unreadCount} alerte{unreadCount > 1 ? 's' : ''}
+            </p>
+            <p className="text-xs text-amber-600 truncate">{latestAlert.message}</p>
+          </div>
+          <span className="text-xs text-amber-500 shrink-0">Voir →</span>
+        </button>
+      )}
 
       {/* Big food cost number */}
       <div className={`rounded-xl border p-6 mb-4 text-center ${STATUS_COLORS[avgStatus].bg} ${STATUS_COLORS[avgStatus].border}`}>
@@ -150,7 +187,8 @@ export default function Dashboard() {
           <RecipeRow
             key={recipe.id}
             recipe={recipe}
-            onClick={() => navigate(`/recipes/${recipe.id}`)}
+            onClickRecipe={() => navigate(`/recipes/${recipe.id}`)}
+            onSimulate={() => navigate(`/recipes/${recipe.id}/simulate`)}
           />
         ))}
       </div>

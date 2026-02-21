@@ -23,6 +23,7 @@ from app.schemas.invoice import (
     InvoiceListResponse,
     InvoiceUploadResponse,
 )
+from app.services.alerts import check_and_create_alerts
 from app.services.costing import recalculate_recipes_for_ingredient
 from app.services.invoice_router import parse_invoice_file
 from app.services.matching import match_invoice_lines, save_alias
@@ -238,6 +239,8 @@ async def confirm_invoice(
     ingredients_created = 0
     aliases_saved = 0
     affected_ingredient_ids: set[int] = set()
+    # Track old→new prices for alert generation
+    price_changes: list[tuple[int, float | None, float]] = []  # (ingredient_id, old_price, new_price)
 
     for line in body.lines:
         # Skip ignored lines
@@ -276,12 +279,14 @@ async def confirm_invoice(
             )
             ingredient = ing_result.scalar_one_or_none()
             if ingredient:
+                old_price = ingredient.current_price
                 ingredient.current_price = line.unit_price
                 ingredient.last_updated = dt.datetime.utcnow()
                 if invoice.supplier_name:
                     ingredient.supplier_name = invoice.supplier_name
                 prices_updated += 1
                 affected_ingredient_ids.add(ingredient_id)
+                price_changes.append((ingredient_id, old_price, line.unit_price))
 
                 # Record price history
                 history = IngredientPriceHistory(
@@ -302,6 +307,12 @@ async def confirm_invoice(
     for ing_id in affected_ingredient_ids:
         await recalculate_recipes_for_ingredient(db, ing_id)
         recipes_recalculated += 1  # Count unique ingredients that triggered recalc
+
+    # Generate alerts for price changes (after recalculation so food_cost_percent is up to date)
+    for ing_id, old_price, new_price in price_changes:
+        await check_and_create_alerts(
+            db, restaurant.id, ing_id, old_price, new_price, invoice.id
+        )
 
     # Update invoice status
     invoice.status = "confirmed"
