@@ -10,8 +10,11 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import engine
+from fastapi.staticfiles import StaticFiles
+
 from app.routers.auth import router as auth_router
 from app.routers.ingredients import router as ingredients_router
+from app.routers.onboarding import router as onboarding_router
 from app.routers.recipes import router as recipes_router
 
 
@@ -51,6 +54,14 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(ingredients_router, prefix="/api/ingredients", tags=["ingredients"])
 app.include_router(recipes_router, prefix="/api/recipes", tags=["recipes"])
+app.include_router(onboarding_router, prefix="/api/onboarding", tags=["onboarding"])
+
+# --- Static files for uploads (dev only) ---
+if settings.environment == "development":
+    from pathlib import Path
+    uploads_dir = Path("uploads")
+    uploads_dir.mkdir(exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 # --- Health check ---

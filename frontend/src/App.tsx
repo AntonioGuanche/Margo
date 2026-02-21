@@ -10,6 +10,7 @@ import Recipes from './pages/Recipes';
 import RecipeDetail from './pages/RecipeDetail';
 import RecipeNew from './pages/RecipeNew';
 import RecipeEdit from './pages/RecipeEdit';
+import Onboarding from './pages/Onboarding';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/recipes/new" element={<RecipeNew />} />
             <Route path="/recipes/:id" element={<RecipeDetail />} />
             <Route path="/recipes/:id/edit" element={<RecipeEdit />} />
+            <Route path="/onboarding" element={<Onboarding />} />
           </Route>
         </Routes>
       </BrowserRouter>

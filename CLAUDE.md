@@ -102,4 +102,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 2 — Recipes & Food Cost. See @PLAN.md for full roadmap.
+Sprint 3 — AI Onboarding. See @PLAN.md for full roadmap.

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ChefHat, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, ChefHat, TrendingUp, Camera } from 'lucide-react';
 import { useDashboard } from '../hooks/useRecipes';
 import type { RecipeListItem } from '../hooks/useRecipes';
 
@@ -69,10 +69,17 @@ export default function Dashboard() {
             Ajoute ta première recette pour voir ton food cost
           </p>
           <button
-            onClick={() => navigate('/recipes')}
-            className="bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-800 transition-colors"
+            onClick={() => navigate('/onboarding')}
+            className="w-full bg-orange-700 text-white px-4 py-4 rounded-xl text-lg font-medium hover:bg-orange-800 transition-colors flex items-center justify-center gap-2 mb-3"
           >
-            Créer une recette
+            <Camera size={24} />
+            Commencer — Photographier ma carte
+          </button>
+          <button
+            onClick={() => navigate('/recipes/new')}
+            className="text-sm text-orange-700 hover:underline"
+          >
+            Ou créer une recette manuellement
           </button>
         </div>
       </div>
