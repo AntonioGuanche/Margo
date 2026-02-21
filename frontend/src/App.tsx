@@ -11,6 +11,9 @@ import RecipeDetail from './pages/RecipeDetail';
 import RecipeNew from './pages/RecipeNew';
 import RecipeEdit from './pages/RecipeEdit';
 import Onboarding from './pages/Onboarding';
+import Invoices from './pages/Invoices';
+import InvoiceUpload from './pages/InvoiceUpload';
+import InvoiceReview from './pages/InvoiceReview';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +48,9 @@ export default function App() {
             <Route path="/recipes/:id" element={<RecipeDetail />} />
             <Route path="/recipes/:id/edit" element={<RecipeEdit />} />
             <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/invoices" element={<Invoices />} />
+            <Route path="/invoices/upload" element={<InvoiceUpload />} />
+            <Route path="/invoices/:id/review" element={<InvoiceReview />} />
           </Route>
         </Routes>
       </BrowserRouter>

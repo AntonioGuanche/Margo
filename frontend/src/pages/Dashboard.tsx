@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ChefHat, TrendingUp, Camera } from 'lucide-react';
+import { LayoutDashboard, ChefHat, TrendingUp, Camera, FileDown } from 'lucide-react';
 import { useDashboard } from '../hooks/useRecipes';
 import type { RecipeListItem } from '../hooks/useRecipes';
 
@@ -131,6 +131,15 @@ export default function Dashboard() {
           <p className="text-xs text-red-600">Critique</p>
         </div>
       </div>
+
+      {/* Import invoice CTA */}
+      <button
+        onClick={() => navigate('/invoices/upload')}
+        className="w-full bg-stone-100 border border-stone-200 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-stone-200 transition-colors mb-4"
+      >
+        <FileDown size={20} className="text-orange-700" />
+        <span className="text-sm font-medium text-stone-700">Importer une facture</span>
+      </button>
 
       {/* Recipe list sorted worst first */}
       <div className="space-y-2">

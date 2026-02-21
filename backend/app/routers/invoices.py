@@ -1,0 +1,342 @@
+"""Invoice API endpoints — upload, list, detail, confirm, delete."""
+
+import datetime as dt
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.models.ingredient import Ingredient
+from app.models.ingredient_alias import IngredientAlias
+from app.models.invoice import Invoice
+from app.models.price_history import IngredientPriceHistory
+from app.models.restaurant import Restaurant
+from app.dependencies import get_current_restaurant
+from app.schemas.invoice import (
+    IngredientSuggestion,
+    InvoiceConfirmRequest,
+    InvoiceConfirmResponse,
+    InvoiceDetailResponse,
+    InvoiceLineResponse,
+    InvoiceListItem,
+    InvoiceListResponse,
+    InvoiceUploadResponse,
+)
+from app.services.costing import recalculate_recipes_for_ingredient
+from app.services.invoice_router import parse_invoice_file
+from app.services.matching import match_invoice_lines, save_alias
+from app.services.storage import save_upload
+
+router = APIRouter()
+
+
+def _build_line_responses(match_results: list) -> list[dict]:
+    """Convert MatchResult list to serializable dicts for JSONB storage."""
+    lines = []
+    for mr in match_results:
+        lines.append({
+            "description": mr.invoice_line.description,
+            "quantity": mr.invoice_line.quantity,
+            "unit": mr.invoice_line.unit,
+            "unit_price": mr.invoice_line.unit_price,
+            "total_price": mr.invoice_line.total_price,
+            "matched_ingredient_id": mr.matched_ingredient_id,
+            "matched_ingredient_name": mr.matched_ingredient_name,
+            "match_confidence": mr.confidence,
+            "suggestions": mr.suggestions,
+        })
+    return lines
+
+
+@router.post("/upload", response_model=InvoiceUploadResponse)
+async def upload_invoice(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    restaurant: Restaurant = Depends(get_current_restaurant),
+) -> InvoiceUploadResponse:
+    """Upload an invoice file (XML, PDF, or image).
+
+    Parses the file, matches lines to ingredients, and saves to DB.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=422, detail="Le fichier doit avoir un nom.")
+
+    # Save file
+    file_path = await save_upload(file, subfolder="invoices")
+
+    # Parse
+    parsed = await parse_invoice_file(file_path, file.filename)
+
+    # Match lines to ingredients
+    match_results = await match_invoice_lines(db, restaurant.id, parsed.lines)
+
+    # Build serializable line data
+    line_dicts = _build_line_responses(match_results)
+
+    # Create Invoice in DB
+    invoice = Invoice(
+        restaurant_id=restaurant.id,
+        image_url=file_path,
+        supplier_name=parsed.supplier_name,
+        invoice_date=dt.date.fromisoformat(parsed.invoice_date) if parsed.invoice_date else None,
+        source="upload",
+        format=parsed.format,
+        status="pending_review",
+        extracted_lines=line_dicts,
+        total_amount=parsed.total_incl_vat or parsed.total_excl_vat,
+    )
+    db.add(invoice)
+    await db.flush()
+    await db.refresh(invoice)
+
+    # Build response
+    response_lines = [
+        InvoiceLineResponse(
+            description=ld["description"],
+            quantity=ld["quantity"],
+            unit=ld["unit"],
+            unit_price=ld["unit_price"],
+            total_price=ld["total_price"],
+            matched_ingredient_id=ld["matched_ingredient_id"],
+            matched_ingredient_name=ld["matched_ingredient_name"],
+            match_confidence=ld["match_confidence"],
+            suggestions=[
+                IngredientSuggestion(**s) for s in ld["suggestions"]
+            ],
+        )
+        for ld in line_dicts
+    ]
+
+    return InvoiceUploadResponse(
+        invoice_id=invoice.id,
+        supplier_name=parsed.supplier_name,
+        invoice_number=parsed.invoice_number,
+        invoice_date=parsed.invoice_date,
+        total_excl_vat=parsed.total_excl_vat,
+        total_incl_vat=parsed.total_incl_vat,
+        lines=response_lines,
+        format=parsed.format,
+        status="pending_review",
+        raw_text=parsed.raw_text,
+    )
+
+
+@router.get("", response_model=InvoiceListResponse)
+async def list_invoices(
+    status: str | None = Query(None, description="Filter by status"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    restaurant: Restaurant = Depends(get_current_restaurant),
+) -> InvoiceListResponse:
+    """List invoices for the current restaurant."""
+    query = select(Invoice).where(Invoice.restaurant_id == restaurant.id)
+
+    if status:
+        query = query.where(Invoice.status == status)
+
+    # Count total
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Fetch page
+    query = query.order_by(Invoice.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    invoices = result.scalars().all()
+
+    items = []
+    for inv in invoices:
+        lines_count = len(inv.extracted_lines) if inv.extracted_lines else 0
+        items.append(InvoiceListItem(
+            id=inv.id,
+            supplier_name=inv.supplier_name,
+            invoice_date=str(inv.invoice_date) if inv.invoice_date else None,
+            source=inv.source,
+            format=inv.format,
+            status=inv.status,
+            total_amount=inv.total_amount,
+            lines_count=lines_count,
+            created_at=inv.created_at,
+        ))
+
+    return InvoiceListResponse(items=items, total=total)
+
+
+@router.get("/{invoice_id}", response_model=InvoiceDetailResponse)
+async def get_invoice(
+    invoice_id: int,
+    db: AsyncSession = Depends(get_db),
+    restaurant: Restaurant = Depends(get_current_restaurant),
+) -> InvoiceDetailResponse:
+    """Get invoice detail with lines and match results."""
+    result = await db.execute(
+        select(Invoice).where(
+            Invoice.id == invoice_id,
+            Invoice.restaurant_id == restaurant.id,
+        )
+    )
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Facture introuvable.")
+
+    # Rebuild line responses from JSONB
+    lines = []
+    if invoice.extracted_lines:
+        for ld in invoice.extracted_lines:
+            lines.append(InvoiceLineResponse(
+                description=ld["description"],
+                quantity=ld.get("quantity"),
+                unit=ld.get("unit"),
+                unit_price=ld.get("unit_price"),
+                total_price=ld.get("total_price"),
+                matched_ingredient_id=ld.get("matched_ingredient_id"),
+                matched_ingredient_name=ld.get("matched_ingredient_name"),
+                match_confidence=ld.get("match_confidence", "none"),
+                suggestions=[
+                    IngredientSuggestion(**s) for s in ld.get("suggestions", [])
+                ],
+            ))
+
+    return InvoiceDetailResponse(
+        id=invoice.id,
+        supplier_name=invoice.supplier_name,
+        invoice_date=str(invoice.invoice_date) if invoice.invoice_date else None,
+        source=invoice.source,
+        format=invoice.format,
+        status=invoice.status,
+        total_amount=invoice.total_amount,
+        lines=lines,
+        raw_text=None,  # Could store in JSONB if needed
+        created_at=invoice.created_at,
+    )
+
+
+@router.post("/{invoice_id}/confirm", response_model=InvoiceConfirmResponse)
+async def confirm_invoice(
+    invoice_id: int,
+    body: InvoiceConfirmRequest,
+    db: AsyncSession = Depends(get_db),
+    restaurant: Restaurant = Depends(get_current_restaurant),
+) -> InvoiceConfirmResponse:
+    """Confirm invoice lines: update prices, create ingredients, save aliases, recalculate recipes."""
+    result = await db.execute(
+        select(Invoice).where(
+            Invoice.id == invoice_id,
+            Invoice.restaurant_id == restaurant.id,
+        )
+    )
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Facture introuvable.")
+
+    if invoice.status == "confirmed":
+        raise HTTPException(status_code=400, detail="Cette facture a déjà été confirmée.")
+
+    prices_updated = 0
+    ingredients_created = 0
+    aliases_saved = 0
+    affected_ingredient_ids: set[int] = set()
+
+    for line in body.lines:
+        # Skip ignored lines
+        if line.ingredient_id is None and line.create_ingredient_name is None:
+            continue
+
+        ingredient_id = line.ingredient_id
+
+        # Create new ingredient if requested
+        if line.create_ingredient_name:
+            new_ingredient = Ingredient(
+                restaurant_id=restaurant.id,
+                name=line.create_ingredient_name,
+                unit=line.unit or "kg",
+                current_price=line.unit_price,
+                supplier_name=invoice.supplier_name,
+                last_updated=dt.datetime.utcnow(),
+            )
+            db.add(new_ingredient)
+            await db.flush()
+            await db.refresh(new_ingredient)
+            ingredient_id = new_ingredient.id
+            ingredients_created += 1
+
+            # Save alias for the new ingredient
+            await save_alias(db, restaurant.id, line.description, ingredient_id)
+            aliases_saved += 1
+
+        if ingredient_id and line.unit_price is not None:
+            # Update ingredient price
+            ing_result = await db.execute(
+                select(Ingredient).where(
+                    Ingredient.id == ingredient_id,
+                    Ingredient.restaurant_id == restaurant.id,
+                )
+            )
+            ingredient = ing_result.scalar_one_or_none()
+            if ingredient:
+                ingredient.current_price = line.unit_price
+                ingredient.last_updated = dt.datetime.utcnow()
+                if invoice.supplier_name:
+                    ingredient.supplier_name = invoice.supplier_name
+                prices_updated += 1
+                affected_ingredient_ids.add(ingredient_id)
+
+                # Record price history
+                history = IngredientPriceHistory(
+                    ingredient_id=ingredient_id,
+                    price=line.unit_price,
+                    date=invoice.invoice_date or dt.date.today(),
+                    invoice_id=invoice.id,
+                )
+                db.add(history)
+
+                # Save alias if description differs from ingredient name
+                if line.description.lower() != ingredient.name.lower():
+                    await save_alias(db, restaurant.id, line.description, ingredient_id)
+                    aliases_saved += 1
+
+    # Cascade recalculate all affected recipes
+    recipes_recalculated = 0
+    for ing_id in affected_ingredient_ids:
+        await recalculate_recipes_for_ingredient(db, ing_id)
+        recipes_recalculated += 1  # Count unique ingredients that triggered recalc
+
+    # Update invoice status
+    invoice.status = "confirmed"
+    await db.flush()
+
+    return InvoiceConfirmResponse(
+        prices_updated=prices_updated,
+        ingredients_created=ingredients_created,
+        aliases_saved=aliases_saved,
+        recipes_recalculated=recipes_recalculated,
+    )
+
+
+@router.delete("/{invoice_id}", status_code=204)
+async def delete_invoice(
+    invoice_id: int,
+    db: AsyncSession = Depends(get_db),
+    restaurant: Restaurant = Depends(get_current_restaurant),
+) -> None:
+    """Delete a pending invoice. Cannot delete confirmed invoices."""
+    result = await db.execute(
+        select(Invoice).where(
+            Invoice.id == invoice_id,
+            Invoice.restaurant_id == restaurant.id,
+        )
+    )
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Facture introuvable.")
+
+    if invoice.status == "confirmed":
+        raise HTTPException(
+            status_code=400,
+            detail="Impossible de supprimer une facture confirmée.",
+        )
+
+    await db.delete(invoice)
+    await db.flush()

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2">
+  <cbc:ID>INV-2024-001</cbc:ID>
+  <cbc:IssueDate>2024-12-15</cbc:IssueDate>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>Boucherie Dupont</cbc:Name></cac:PartyName>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="KGM">5.0</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="EUR">60.00</cbc:LineExtensionAmount>
+    <cac:Price><cbc:PriceAmount currencyID="EUR">12.00</cbc:PriceAmount></cac:Price>
+    <cac:Item><cbc:Name>Boeuf haché</cbc:Name></cac:Item>
+  </cac:InvoiceLine>
+  <cac:InvoiceLine>
+    <cbc:ID>2</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="KGM">2.0</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="EUR">15.00</cbc:LineExtensionAmount>
+    <cac:Price><cbc:PriceAmount currencyID="EUR">7.50</cbc:PriceAmount></cac:Price>
+    <cac:Item><cbc:Name>Lard fumé</cbc:Name></cac:Item>
+  </cac:InvoiceLine>
+  <cac:LegalMonetaryTotal>
+    <cbc:TaxExclusiveAmount currencyID="EUR">75.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="EUR">90.75</cbc:TaxInclusiveAmount>
+  </cac:LegalMonetaryTotal>
+</Invoice>
