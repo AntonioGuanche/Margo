@@ -48,7 +48,10 @@ class Settings(BaseSettings):
 
     # --- Stripe (Sprint 8) ---
     stripe_secret_key: str = ""
+    stripe_publishable_key: str = ""
     stripe_webhook_secret: str = ""
+    stripe_price_pro: str = ""
+    stripe_price_multi: str = ""
 
     # --- App ---
     frontend_url: str = "http://localhost:5173"

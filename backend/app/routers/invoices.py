@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.middleware.plan_limits import require_invoice_quota
 from app.middleware.rate_limit import check_upload_rate_limit
 from app.models.ingredient import Ingredient
 from app.models.ingredient_alias import IngredientAlias
@@ -69,7 +70,7 @@ def _build_line_responses(match_results: list) -> list[dict]:
 async def upload_invoice(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    restaurant: Restaurant = Depends(require_invoice_quota),
 ) -> InvoiceUploadResponse:
     """Upload an invoice file (XML, PDF, or image).
 

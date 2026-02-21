@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app.services.billing import handle_webhook_event
 from app.services.email_inbound import InboundEmail, process_inbound_email
 
 logger = logging.getLogger(__name__)
@@ -87,3 +88,23 @@ async def email_inbound_webhook(
         invoices_created=len(invoice_ids),
         invoice_ids=invoice_ids,
     )
+
+
+@router.post("/stripe")
+async def stripe_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Stripe webhook — secured by signature verification, not JWT."""
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature", "")
+
+    if not sig_header:
+        raise HTTPException(status_code=400, detail="Missing Stripe signature.")
+
+    try:
+        await handle_webhook_event(db, payload, sig_header)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {"status": "ok"}

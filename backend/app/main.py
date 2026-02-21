@@ -16,10 +16,13 @@ from fastapi.staticfiles import StaticFiles
 
 from app.routers.alerts import router as alerts_router
 from app.routers.auth import router as auth_router
+from app.routers.billing import router as billing_router
+from app.routers.export import router as export_router
 from app.routers.ingredients import router as ingredients_router
 from app.routers.onboarding import router as onboarding_router
 from app.routers.invoices import router as invoices_router
 from app.routers.recipes import router as recipes_router
+from app.routers.restaurants import router as restaurants_router
 from app.routers.simulator import router as simulator_router
 from app.routers.webhooks import router as webhooks_router
 
@@ -70,6 +73,9 @@ app.include_router(onboarding_router, prefix="/api/onboarding", tags=["onboardin
 app.include_router(invoices_router, prefix="/api/invoices", tags=["invoices"])
 app.include_router(alerts_router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(simulator_router, prefix="/api/recipes", tags=["simulator"])
+app.include_router(billing_router, prefix="/api/billing", tags=["billing"])
+app.include_router(export_router, prefix="/api/export", tags=["export"])
+app.include_router(restaurants_router, prefix="/api/restaurants", tags=["restaurants"])
 app.include_router(webhooks_router, prefix="/webhooks", tags=["webhooks"])
 
 # --- Static files for uploads (dev only) ---

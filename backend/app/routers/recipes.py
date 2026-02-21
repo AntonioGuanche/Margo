@@ -19,6 +19,7 @@ from app.schemas.recipe import (
     RecipeResponse,
     RecipeUpdate,
 )
+from app.middleware.plan_limits import require_recipe_quota
 from app.services.costing import calculate_food_cost, get_margin_status, recalculate_recipe
 
 router = APIRouter()
@@ -139,7 +140,7 @@ async def get_recipe(
 @router.post("", response_model=RecipeResponse, status_code=status.HTTP_201_CREATED)
 async def create_recipe(
     data: RecipeCreate,
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    restaurant: Restaurant = Depends(require_recipe_quota),
     db: AsyncSession = Depends(get_db),
 ) -> RecipeResponse:
     """Create a recipe with ingredients, calculate food cost."""

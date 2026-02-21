@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_restaurant
+from app.middleware.plan_limits import require_recipe_quota
 from app.middleware.rate_limit import check_ai_rate_limit, check_upload_rate_limit
 from app.models.ingredient import Ingredient
 from app.models.recipe import Recipe, RecipeIngredient
@@ -118,7 +119,7 @@ async def suggest_ingredients(
 @router.post("/confirm", response_model=OnboardingConfirmResponse)
 async def confirm_onboarding(
     request: OnboardingConfirmRequest,
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    restaurant: Restaurant = Depends(require_recipe_quota),
     db: AsyncSession = Depends(get_db),
 ) -> OnboardingConfirmResponse:
     """Confirm onboarding: create ingredients and recipes in one transaction."""

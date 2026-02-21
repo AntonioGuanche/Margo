@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import ToastProvider from './components/Toast';
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
+import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Ingredients from './pages/Ingredients';
 import Recipes from './pages/Recipes';
@@ -18,6 +19,8 @@ import InvoiceUpload from './pages/InvoiceUpload';
 import InvoiceReview from './pages/InvoiceReview';
 import Alerts from './pages/Alerts';
 import Simulator from './pages/Simulator';
+import Pricing from './pages/Pricing';
+import Settings from './pages/Settings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +39,7 @@ export default function App() {
         <ToastProvider />
         <Routes>
           {/* Public routes */}
+          <Route path="/landing" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
 
@@ -59,6 +63,8 @@ export default function App() {
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/invoices/upload" element={<InvoiceUpload />} />
             <Route path="/invoices/:id/review" element={<InvoiceReview />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>
       </BrowserRouter>

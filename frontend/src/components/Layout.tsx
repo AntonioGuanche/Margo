@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { UtensilsCrossed, LayoutDashboard, ChefHat, FileText, LogOut, Bell } from 'lucide-react';
+import { UtensilsCrossed, LayoutDashboard, ChefHat, FileText, LogOut, Bell, Settings } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useInvoices } from '../hooks/useInvoices';
 import { useAlertCount } from '../hooks/useAlerts';
@@ -34,6 +34,13 @@ export default function Layout() {
                 {unreadAlerts > 9 ? '9+' : unreadAlerts}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => navigate('/settings')}
+            className="text-stone-500 hover:text-stone-700 p-2"
+            title="Paramètres"
+          >
+            <Settings size={20} />
           </button>
           <button
             onClick={handleLogout}

@@ -108,4 +108,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 7 — Polish & Stabilisation. See @PLAN.md for full roadmap.
+Sprint 8 — Monetization & Launch. See @PLAN.md for full roadmap.

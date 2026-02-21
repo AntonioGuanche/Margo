@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, ChefHat, Camera } from 'lucide-react';
 import { useRecipes } from '../hooks/useRecipes';
+import { usePlanInfo } from '../hooks/useBilling';
 import { SkeletonList } from '../components/Skeleton';
+import UpgradeModal from '../components/UpgradeModal';
 import type { RecipeListItem } from '../hooks/useRecipes';
 
 const STATUS_COLORS = {
@@ -43,18 +45,45 @@ export default function Recipes() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const { data, isLoading } = useRecipes(search || undefined);
+  const { data: planInfo } = usePlanInfo();
+  const [showUpgrade, setShowUpgrade] = useState(false);
+
+  const atLimit =
+    planInfo?.max_recipes !== null &&
+    planInfo?.max_recipes !== undefined &&
+    planInfo.current_recipes >= planInfo.max_recipes;
+
+  function handleAdd() {
+    if (atLimit) {
+      setShowUpgrade(true);
+      return;
+    }
+    navigate('/recipes/new');
+  }
 
   return (
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-stone-900 flex items-center gap-2">
-          <ChefHat size={22} className="text-orange-700" />
-          Recettes
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-semibold text-stone-900 flex items-center gap-2">
+            <ChefHat size={22} className="text-orange-700" />
+            Recettes
+          </h2>
+          {planInfo?.max_recipes !== null && planInfo?.max_recipes !== undefined && (
+            <span className="text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">
+              {planInfo.current_recipes}/{planInfo.max_recipes}
+            </span>
+          )}
+        </div>
         <button
-          onClick={() => navigate('/recipes/new')}
-          className="bg-orange-700 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-800 transition-colors flex items-center gap-1"
+          onClick={handleAdd}
+          disabled={atLimit}
+          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+            atLimit
+              ? 'bg-stone-200 text-stone-400 cursor-not-allowed'
+              : 'bg-orange-700 text-white hover:bg-orange-800'
+          }`}
         >
           <Plus size={16} />
           Ajouter
@@ -113,6 +142,12 @@ export default function Recipes() {
           </p>
         </div>
       )}
+
+      <UpgradeModal
+        show={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        message="Tu as atteint la limite de 5 recettes pour le plan gratuit. Passe au Pro pour un accès illimité."
+      />
     </div>
   );
 }
