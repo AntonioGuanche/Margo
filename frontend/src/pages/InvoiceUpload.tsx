@@ -135,7 +135,7 @@ export default function InvoiceUpload() {
               Transfère tes factures fournisseurs à :
             </p>
             <p className="text-sm font-mono bg-stone-50 rounded-lg px-3 py-2 mt-2 text-orange-700 select-all">
-              factures@margo.be
+              factures@heymargo.be
             </p>
             <p className="text-xs text-stone-400 mt-1">
               Les pièces jointes (PDF, XML, images) seront importées automatiquement.

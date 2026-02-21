@@ -246,7 +246,7 @@ async def test_cross_restaurant_isolation(client: AsyncClient, db_session, auth_
     recipe_id = create_resp.json()["id"]
 
     # Create another restaurant
-    other = Restaurant(name="Autre Restaurant", owner_email="other@margo.be")
+    other = Restaurant(name="Autre Restaurant", owner_email="other@heymargo.be")
     db_session.add(other)
     await db_session.flush()
     await db_session.refresh(other)

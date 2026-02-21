@@ -73,7 +73,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 @pytest.fixture
 async def restaurant(db_session: AsyncSession) -> Restaurant:
     """Create a test restaurant in the DB and return it."""
-    resto = Restaurant(name="Test Restaurant", owner_email="test@margo.be")
+    resto = Restaurant(name="Test Restaurant", owner_email="test@heymargo.be")
     db_session.add(resto)
     await db_session.flush()
     await db_session.refresh(resto)

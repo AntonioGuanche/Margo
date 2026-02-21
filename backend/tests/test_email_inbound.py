@@ -32,7 +32,7 @@ async def test_webhook_valid_email(
         "/webhooks/email-inbound",
         json={
             "from_email": restaurant.owner_email,
-            "to": "factures@margo.be",
+            "to": "factures@heymargo.be",
             "subject": "Facture INV-2024-001",
             "attachments": [
                 {
@@ -69,7 +69,7 @@ async def test_webhook_identifies_restaurant(
         "/webhooks/email-inbound",
         json={
             "from_email": restaurant.owner_email,
-            "to": "factures@margo.be",
+            "to": "factures@heymargo.be",
             "subject": "Facture",
             "attachments": [
                 {
@@ -92,7 +92,7 @@ async def test_webhook_invalid_secret(client, webhook_secret):
         "/webhooks/email-inbound",
         json={
             "from_email": "someone@test.com",
-            "to": "factures@margo.be",
+            "to": "factures@heymargo.be",
             "subject": "Test",
             "attachments": [],
         },
@@ -110,7 +110,7 @@ async def test_webhook_no_attachments(
         "/webhooks/email-inbound",
         json={
             "from_email": restaurant.owner_email,
-            "to": "factures@margo.be",
+            "to": "factures@heymargo.be",
             "subject": "Just a message",
             "attachments": [],
         },
@@ -131,7 +131,7 @@ async def test_webhook_unsupported_attachment(
         "/webhooks/email-inbound",
         json={
             "from_email": restaurant.owner_email,
-            "to": "factures@margo.be",
+            "to": "factures@heymargo.be",
             "subject": "Facture",
             "attachments": [
                 {

@@ -37,7 +37,7 @@ class InboundEmail:
     """Parsed inbound email."""
 
     from_email: str
-    to_email: str  # factures@margo.be or factures+{restaurant_id}@margo.be
+    to_email: str  # factures@heymargo.be or factures+{restaurant_id}@heymargo.be
     subject: str
     attachments: list[dict] = field(default_factory=list)
     # Each attachment: {filename, content_type, content_bytes}
@@ -52,7 +52,7 @@ def _is_supported_attachment(filename: str, content_type: str) -> bool:
 
 
 def _extract_restaurant_id_from_email(to_email: str) -> int | None:
-    """Extract restaurant_id from factures+{id}@margo.be."""
+    """Extract restaurant_id from factures+{id}@heymargo.be."""
     match = re.match(r"factures\+(\d+)@", to_email, re.IGNORECASE)
     if match:
         return int(match.group(1))
@@ -65,7 +65,7 @@ async def _identify_restaurant(
     """Identify the restaurant from the email.
 
     Option A: by sender email (from_email == restaurant.owner_email)
-    Option B: by recipient (factures+{restaurant_id}@margo.be)
+    Option B: by recipient (factures+{restaurant_id}@heymargo.be)
     """
     # Option B: by recipient address
     restaurant_id = _extract_restaurant_id_from_email(email.to_email)

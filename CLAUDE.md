@@ -100,6 +100,12 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 
 See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY, R2_*, RESEND_API_KEY, STRIPE_*, FRONTEND_URL, ENVIRONMENT
 
+## Domain
+
+- **Domain:** heymargo.be
+- **Inbound email:** factures@heymargo.be (or factures+{restaurant_id}@heymargo.be)
+- **App URL:** https://heymargo.be (production)
+
 ## Current sprint
 
 Sprint 5 — OCR Photo + Email Forward. See @PLAN.md for full roadmap.

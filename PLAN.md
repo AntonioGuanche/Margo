@@ -17,7 +17,7 @@
 - [ ] Tests: auth flow + ingredients CRUD (pytest + httpx)
 - [ ] Deploy to Railway (backend + frontend + DB)
 
-**Deliverable:** Live app at margo.railway.app, can log in and manage ingredients.
+**Deliverable:** Live app at heymargo.be, can log in and manage ingredients.
 
 ## Sprint 2 — Recipes & Food Cost (Week 2)
 **Goal:** Calculator works, dashboard shows margins
@@ -63,7 +63,7 @@
 **Goal:** All 3 import channels operational
 
 - [ ] OCR service: image → Claude Vision → structured JSON (same schema as XML/PDF parsers)
-- [ ] Email inbound: configure Resend/Mailgun webhook for factures@margo.be
+- [ ] Email inbound: configure Resend/Mailgun webhook for factures@heymargo.be
 - [ ] Webhook endpoint: receive email → extract attachment → detect format → parse
 - [ ] Unified invoice router: any input format → standardized InvoiceExtraction
 - [ ] IngredientPriceHistory table + populated on every confirmed invoice
