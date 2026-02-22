@@ -12,16 +12,19 @@ RUN npm run build
 # =============================================================
 # Stage 2 — Python backend + frontend dist
 # =============================================================
-FROM python:3.12-slim AS base
+FROM python:3.12-slim
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/pyproject.toml .
-RUN pip install --no-cache-dir .
+# Copy full backend and install deps via setuptools
+COPY backend/ /tmp/backend/
+RUN pip install --no-cache-dir /tmp/backend/ \
+    && rm -rf /tmp/backend/
 
+# Copy backend source for runtime
 COPY backend/app/ app/
 COPY backend/alembic/ alembic/
 COPY backend/alembic.ini .

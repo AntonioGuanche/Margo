@@ -1,3 +1,5 @@
+print("Starting Margo API...")  # early diagnostic for Railway deploy logs
+
 """Margó API — FastAPI application entry point."""
 
 from collections.abc import AsyncGenerator
