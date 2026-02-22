@@ -20,10 +20,10 @@ stripe.api_key = settings.stripe_secret_key
 def setup() -> None:
     """Create Stripe products and prices."""
     if not stripe.api_key:
-        print("❌ STRIPE_SECRET_KEY not set in .env")
+        print("[ERROR] STRIPE_SECRET_KEY not set in .env")
         return
 
-    print("🔧 Creating Stripe products and prices...\n")
+    print("[*] Creating Stripe products and prices...\n")
 
     # --- Margó Pro ---
     pro_product = stripe.Product.create(
@@ -38,7 +38,7 @@ def setup() -> None:
         recurring={"interval": "month"},
         metadata={"plan": "pro"},
     )
-    print(f"✅ Margó Pro")
+    print(f"[OK] Margo Pro")
     print(f"   Product ID: {pro_product.id}")
     print(f"   Price ID:   {pro_price.id}")
     print()
@@ -46,7 +46,7 @@ def setup() -> None:
     # --- Margó Multi ---
     multi_product = stripe.Product.create(
         name="Margó Multi",
-        description="Tout Pro + jusqu'à 5 établissements, dashboard consolidé.",
+        description="Tout Pro + jusqu'a 5 etablissements, dashboard consolide.",
         metadata={"plan": "multi"},
     )
     multi_price = stripe.Price.create(
@@ -56,13 +56,13 @@ def setup() -> None:
         recurring={"interval": "month"},
         metadata={"plan": "multi"},
     )
-    print(f"✅ Margó Multi")
+    print(f"[OK] Margo Multi")
     print(f"   Product ID: {multi_product.id}")
     print(f"   Price ID:   {multi_price.id}")
     print()
 
     print("=" * 60)
-    print("📋 Copie ces lignes dans ton .env :")
+    print("Copie ces lignes dans ton .env :")
     print()
     print(f"STRIPE_PRICE_PRO={pro_price.id}")
     print(f"STRIPE_PRICE_MULTI={multi_price.id}")

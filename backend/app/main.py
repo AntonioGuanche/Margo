@@ -2,9 +2,12 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -12,7 +15,6 @@ from app.config import settings
 from app.database import engine
 from app.logging_config import setup_logging
 from app.middleware.error_handler import register_error_handlers
-from fastapi.staticfiles import StaticFiles
 
 from app.routers.alerts import router as alerts_router
 from app.routers.auth import router as auth_router
@@ -80,7 +82,6 @@ app.include_router(webhooks_router, prefix="/webhooks", tags=["webhooks"])
 
 # --- Static files for uploads (dev only) ---
 if settings.environment == "development":
-    from pathlib import Path
     uploads_dir = Path("uploads")
     uploads_dir.mkdir(exist_ok=True)
     app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -100,3 +101,17 @@ async def health_check() -> HealthResponse:
         environment=settings.environment,
         version=app.version,
     )
+
+
+# --- Serve frontend SPA (built React app) ---
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+if STATIC_DIR.is_dir():
+    # Serve /assets/* (JS, CSS, images from Vite build)
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="frontend-assets")
+
+    @app.get("/{full_path:path}", response_class=HTMLResponse)
+    async def spa_fallback(request: Request, full_path: str) -> HTMLResponse:
+        """Serve index.html for any route not matched by API/webhooks/health."""
+        index = STATIC_DIR / "index.html"
+        return HTMLResponse(content=index.read_text(encoding="utf-8"))
