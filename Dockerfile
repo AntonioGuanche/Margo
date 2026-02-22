@@ -27,10 +27,11 @@ RUN pip install --no-cache-dir .
 COPY backend/app/ app/
 COPY backend/alembic/ alembic/
 COPY backend/alembic.ini .
+COPY backend/scripts/ scripts/
 
 # Copy built frontend into /app/static
 COPY --from=frontend-build /frontend/dist /app/static
 
 EXPOSE 8080
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["bash", "scripts/start.sh"]

@@ -36,15 +36,7 @@ setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Startup: run migrations, verify DB connection. Shutdown: dispose engine."""
-    import subprocess
-
-    result = subprocess.run(["alembic", "upgrade", "head"], capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"Alembic warning: {result.stderr}")
-    else:
-        print("Alembic migrations applied successfully.")
-
+    """Startup: verify DB connection. Shutdown: dispose engine."""
     async with engine.begin() as conn:
         await conn.execute(text("SELECT 1"))
     yield
