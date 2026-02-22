@@ -19,10 +19,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy full backend and install deps via setuptools
-COPY backend/ /tmp/backend/
-RUN pip install --no-cache-dir /tmp/backend/ \
-    && rm -rf /tmp/backend/
+# Install Python dependencies (pyproject.toml only, no source yet)
+COPY backend/pyproject.toml .
+RUN pip install --no-cache-dir .
 
 # Copy backend source for runtime
 COPY backend/app/ app/

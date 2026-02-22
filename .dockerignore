@@ -1,0 +1,10 @@
+.git
+.env
+*.zip
+node_modules
+__pycache__
+.vscode
+.idea
+backend/tests
+backend/uploads
+backend/.env

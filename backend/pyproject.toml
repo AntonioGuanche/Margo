@@ -36,6 +36,9 @@ testpaths = ["tests"]
 target-version = "py312"
 line-length = 100
 
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [build-system]
 requires = ["setuptools>=70.0"]
 build-backend = "setuptools.build_meta"
