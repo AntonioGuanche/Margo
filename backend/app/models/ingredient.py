@@ -20,6 +20,7 @@ class Ingredient(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     unit: Mapped[str] = mapped_column(String(20), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(50), nullable=True)
     current_price: Mapped[float | None] = mapped_column(nullable=True)
     supplier_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     last_updated: Mapped[datetime | None] = mapped_column(nullable=True)

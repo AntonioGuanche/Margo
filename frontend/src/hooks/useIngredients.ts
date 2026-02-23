@@ -9,6 +9,7 @@ export interface Ingredient {
   unit: UnitType;
   current_price: number | null;
   supplier_name: string | null;
+  category: string | null;
   last_updated: string | null;
   created_at: string;
 }
@@ -23,6 +24,7 @@ interface IngredientCreate {
   unit: UnitType;
   current_price?: number | null;
   supplier_name?: string | null;
+  category?: string | null;
 }
 
 interface IngredientUpdate {
@@ -30,6 +32,7 @@ interface IngredientUpdate {
   unit?: UnitType;
   current_price?: number | null;
   supplier_name?: string | null;
+  category?: string | null;
 }
 
 export function useIngredients(search?: string) {

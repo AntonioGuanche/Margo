@@ -21,6 +21,7 @@ class InvoiceLineResponse(BaseModel):
     unit: str | None = None
     unit_price: float | None = None
     total_price: float | None = None
+    units_per_package: int | None = None
     matched_ingredient_id: int | None = None
     matched_ingredient_name: str | None = None
     match_confidence: str = "none"
@@ -52,6 +53,11 @@ class InvoiceConfirmLine(BaseModel):
     add_to_recipe_id: int | None = None
     recipe_quantity: float | None = None
     recipe_unit: str | None = None
+    # Optional: create a new recipe/product from this line
+    create_recipe_name: str | None = None
+    create_recipe_price: float | None = None
+    create_recipe_category: str | None = None
+    create_recipe_is_homemade: bool = False
 
 
 class InvoiceConfirmRequest(BaseModel):
@@ -63,6 +69,7 @@ class InvoiceConfirmResponse(BaseModel):
     ingredients_created: int
     aliases_saved: int
     recipes_recalculated: int
+    recipes_created: int = 0
 
 
 # --- List ---

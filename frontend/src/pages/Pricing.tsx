@@ -16,7 +16,7 @@ const plans = [
   {
     key: 'pro',
     name: 'Pro',
-    price: '14,90\u00a0\u20ac',
+    price: '14,90 €',
     period: '/mois',
     features: [
       'Recettes illimitées',
@@ -29,7 +29,7 @@ const plans = [
   {
     key: 'multi',
     name: 'Multi',
-    price: '24,90\u00a0\u20ac',
+    price: '24,90 €',
     period: '/mois',
     features: [
       'Tout Pro',

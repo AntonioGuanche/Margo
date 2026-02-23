@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Plus, Search, Pencil, Trash2, UtensilsCrossed, TrendingUp } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, UtensilsCrossed, TrendingUp, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   useIngredients,
   useCreateIngredient,
@@ -21,12 +21,37 @@ const UNIT_LABELS: Record<UnitType, string> = {
   piece: 'pièce',
 };
 
+const CATEGORY_ORDER = [
+  'boissons',
+  'viandes & poissons',
+  'fruits & légumes',
+  'produits laitiers',
+  'épicerie & sec',
+  'surgelés',
+  'autre',
+];
+
+function groupByCategory(ingredients: Ingredient[]) {
+  const groups: Record<string, Ingredient[]> = {};
+  for (const ing of ingredients) {
+    const cat = ing.category?.toLowerCase() || 'non catégorisé';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(ing);
+  }
+  return Object.entries(groups).sort(([a], [b]) => {
+    const ia = CATEGORY_ORDER.indexOf(a);
+    const ib = CATEGORY_ORDER.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+}
+
 export default function Ingredients() {
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Ingredient | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [historyId, setHistoryId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<Ingredient | null>(null);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const { data, isLoading } = useIngredients(search || undefined);
   const createMutation = useCreateIngredient();
@@ -38,6 +63,7 @@ export default function Ingredients() {
     unit: UnitType;
     current_price?: number | null;
     supplier_name?: string | null;
+    category?: string | null;
   }) {
     createMutation.mutate(formData, {
       onSuccess: () => {
@@ -53,6 +79,7 @@ export default function Ingredients() {
     unit: UnitType;
     current_price?: number | null;
     supplier_name?: string | null;
+    category?: string | null;
   }) {
     if (!editing) return;
     updateMutation.mutate(
@@ -77,6 +104,13 @@ export default function Ingredients() {
       onError: (err) => toast.error(err.message),
     });
   }
+
+  const ingredients = data?.items ?? [];
+  const grouped = groupByCategory(ingredients);
+
+  const toggleCategory = (cat: string) => {
+    setCollapsed((prev) => ({ ...prev, [cat]: !prev[cat] }));
+  };
 
   return (
     <div>
@@ -110,10 +144,10 @@ export default function Ingredients() {
         />
       </div>
 
-      {/* List */}
+      {/* List grouped by category */}
       {isLoading ? (
         <SkeletonList count={5} />
-      ) : !data?.items.length ? (
+      ) : ingredients.length === 0 ? (
         <div className="bg-white rounded-xl border border-stone-200 p-8 text-center">
           <UtensilsCrossed size={40} className="mx-auto text-stone-300 mb-3" />
           <p className="text-stone-600 font-medium mb-1">
@@ -126,62 +160,88 @@ export default function Ingredients() {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {data.items.map((ingredient) => (
-            <div key={ingredient.id}>
-              <div className="bg-white rounded-xl border border-stone-200 px-4 py-3 flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium text-stone-900 truncate">
-                    {ingredient.name}
+        <div className="space-y-4">
+          {grouped.map(([category, items], idx) => {
+            const isCollapsed = collapsed[category] ?? (idx > 0);
+
+            return (
+              <div key={category}>
+                <button
+                  onClick={() => toggleCategory(category)}
+                  className="flex items-center gap-2 w-full text-left mb-2"
+                >
+                  {isCollapsed ? (
+                    <ChevronRight size={14} className="text-stone-400" />
+                  ) : (
+                    <ChevronDown size={14} className="text-stone-400" />
+                  )}
+                  <span className="text-xs font-semibold text-stone-500 uppercase tracking-wide">
+                    {category} ({items.length})
+                  </span>
+                </button>
+
+                {!isCollapsed && (
+                  <div className="space-y-2">
+                    {items.map((ingredient) => (
+                      <div key={ingredient.id}>
+                        <div className="bg-white rounded-xl border border-stone-200 px-4 py-3 flex items-center justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-stone-900 truncate">
+                              {ingredient.name}
+                            </div>
+                            <div className="text-sm text-stone-500 flex gap-3 mt-0.5">
+                              <span>{UNIT_LABELS[ingredient.unit]}</span>
+                              {ingredient.current_price != null && (
+                                <span className="text-emerald-600 font-medium">
+                                  {ingredient.current_price.toFixed(2)} €/{UNIT_LABELS[ingredient.unit]}
+                                </span>
+                              )}
+                              {ingredient.supplier_name && (
+                                <span className="truncate">{ingredient.supplier_name}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 ml-2 shrink-0">
+                            <button
+                              onClick={() => setHistoryId(historyId === ingredient.id ? null : ingredient.id)}
+                              className={`p-2 transition-colors ${historyId === ingredient.id ? 'text-orange-700' : 'text-stone-400 hover:text-orange-700'}`}
+                              title="Historique des prix"
+                            >
+                              <TrendingUp size={16} />
+                            </button>
+                            <button
+                              onClick={() => setEditing(ingredient)}
+                              className="p-2 text-stone-400 hover:text-orange-700 transition-colors"
+                              title="Modifier"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button
+                              onClick={() => setDeleting(ingredient)}
+                              className="p-2 text-stone-400 hover:text-red-600 transition-colors"
+                              title="Supprimer"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                        {historyId === ingredient.id && (
+                          <div className="mt-1 mb-2">
+                            <PriceHistoryChart
+                              ingredientId={ingredient.id}
+                              onClose={() => setHistoryId(null)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-sm text-stone-500 flex gap-3 mt-0.5">
-                    <span>{UNIT_LABELS[ingredient.unit]}</span>
-                    {ingredient.current_price != null && (
-                      <span className="text-emerald-600 font-medium">
-                        {ingredient.current_price.toFixed(2)} €/{UNIT_LABELS[ingredient.unit]}
-                      </span>
-                    )}
-                    {ingredient.supplier_name && (
-                      <span className="truncate">{ingredient.supplier_name}</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 ml-2 shrink-0">
-                  <button
-                    onClick={() => setHistoryId(historyId === ingredient.id ? null : ingredient.id)}
-                    className={`p-2 transition-colors ${historyId === ingredient.id ? 'text-orange-700' : 'text-stone-400 hover:text-orange-700'}`}
-                    title="Historique des prix"
-                  >
-                    <TrendingUp size={16} />
-                  </button>
-                  <button
-                    onClick={() => setEditing(ingredient)}
-                    className="p-2 text-stone-400 hover:text-orange-700 transition-colors"
-                    title="Modifier"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    onClick={() => setDeleting(ingredient)}
-                    className="p-2 text-stone-400 hover:text-red-600 transition-colors"
-                    title="Supprimer"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                )}
               </div>
-              {historyId === ingredient.id && (
-                <div className="mt-1 mb-2">
-                  <PriceHistoryChart
-                    ingredientId={ingredient.id}
-                    onClose={() => setHistoryId(null)}
-                  />
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
           <p className="text-sm text-stone-400 text-center pt-2">
-            {data.total} ingrédient{data.total > 1 ? 's' : ''}
+            {data?.total ?? 0} ingrédient{(data?.total ?? 0) > 1 ? 's' : ''}
           </p>
         </div>
       )}

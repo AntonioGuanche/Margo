@@ -181,7 +181,7 @@ export default function InvoiceUpload() {
                   <p className="text-xs text-red-600">{item.error}</p>
                 )}
                 {item.status === 'done' && (
-                  <p className="text-xs text-emerald-600">Import\u00e9e avec succ\u00e8s</p>
+                  <p className="text-xs text-emerald-600">Importée avec succès</p>
                 )}
               </div>
 
@@ -191,7 +191,7 @@ export default function InvoiceUpload() {
                   onClick={() => navigate(`/invoices/${item.invoiceId}/review`)}
                   className="text-xs text-orange-700 font-medium hover:text-orange-800"
                 >
-                  V\u00e9rifier
+                  Vérifier
                 </button>
               )}
               {(item.status === 'pending' || item.status === 'error') && (
@@ -211,7 +211,7 @@ export default function InvoiceUpload() {
               onClick={() => navigate('/invoices')}
               className="w-full bg-orange-700 text-white py-3 rounded-xl font-medium hover:bg-orange-800 transition-colors mt-2"
             >
-              Voir mes factures ({doneCount} import\u00e9e{doneCount > 1 ? 's' : ''})
+              Voir mes factures ({doneCount} importée{doneCount > 1 ? 's' : ''})
             </button>
           )}
         </div>
@@ -225,7 +225,7 @@ export default function InvoiceUpload() {
           </div>
           <div className="flex-1">
             <p className="font-medium text-stone-900 text-sm">Scanner une facture</p>
-            <p className="text-xs text-stone-500">Prendre en photo avec la cam\u00e9ra</p>
+            <p className="text-xs text-stone-500">Prendre en photo avec la caméra</p>
           </div>
           <label className="bg-stone-100 text-stone-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-stone-200 transition-colors cursor-pointer">
             Ouvrir
@@ -247,15 +247,15 @@ export default function InvoiceUpload() {
             <Mail size={20} className="text-blue-700" />
           </div>
           <div className="flex-1">
-            <p className="font-medium text-stone-900 text-sm">Transf\u00e9rer par email</p>
+            <p className="font-medium text-stone-900 text-sm">Transférer par email</p>
             <p className="text-xs text-stone-500 mt-0.5">
-              Transf\u00e8re tes factures fournisseurs \u00e0 :
+              Transfère tes factures fournisseurs à :
             </p>
             <p className="text-sm font-mono bg-stone-50 rounded-lg px-3 py-2 mt-2 text-orange-700 select-all">
               factures@heymargo.be
             </p>
             <p className="text-xs text-stone-400 mt-1">
-              Les pi\u00e8ces jointes (PDF, XML, images) seront import\u00e9es automatiquement.
+              Les pièces jointes (PDF, XML, images) seront importées automatiquement.
             </p>
           </div>
         </div>

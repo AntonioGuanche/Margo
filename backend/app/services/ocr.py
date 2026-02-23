@@ -29,6 +29,7 @@ Extrais les informations suivantes :
   - unit : unité si identifiable (fût, casier, bouteille, carton, L, kg, pce), sinon null
   - unit_price : prix unitaire HTVA (hors accises si applicable)
   - total_price : prix total ligne HTVA (= prix unitaire × quantité)
+  - units_per_package : nombre d'unités par conditionnement si identifiable (ex: "24/3" → 24, "6x25cl" → 6). Null si non identifiable ou si c'est un fût/bag-in-box.
 
 IMPORTANT :
 - Les factures de boissons belges ont souvent des colonnes "Hors Accises" et "Accises" — utilise le prix HORS accises comme unit_price.
@@ -46,7 +47,7 @@ Format :
   "total_excl_vat": 0.00,
   "total_incl_vat": 0.00,
   "lines": [
-    {"description": "...", "quantity": 0, "unit": "...", "unit_price": 0.00, "total_price": 0.00}
+    {"description": "...", "quantity": 0, "unit": "...", "unit_price": 0.00, "total_price": 0.00, "units_per_package": null}
   ]
 }
 Si quelque chose est illisible, mets null.
@@ -195,6 +196,7 @@ async def extract_invoice_from_image(image_path: str) -> ParsedInvoice:
                 unit=item.get("unit"),
                 unit_price=item.get("unit_price"),
                 total_price=item.get("total_price"),
+                units_per_package=item.get("units_per_package"),
             ))
 
         fmt = "pdf" if is_pdf else "image"

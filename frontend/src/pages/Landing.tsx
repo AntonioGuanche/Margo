@@ -39,14 +39,14 @@ const plans = [
   },
   {
     name: 'Pro',
-    price: '14,90\u00a0\u20ac',
+    price: '14,90 €',
     period: '/mois',
     features: ['Recettes illimitées', 'Factures illimitées', 'Alertes email', 'Export CSV'],
     highlight: true,
   },
   {
     name: 'Multi',
-    price: '24,90\u00a0\u20ac',
+    price: '24,90 €',
     period: '/mois',
     features: ["Tout Pro", "Jusqu'à 5 établissements", 'Dashboard consolidé'],
     highlight: false,

@@ -10,6 +10,17 @@ const UNITS: { value: UnitType; label: string }[] = [
   { value: 'piece', label: 'pièce' },
 ];
 
+const CATEGORIES = [
+  { value: '', label: 'Non catégorisé' },
+  { value: 'boissons', label: 'Boissons' },
+  { value: 'viandes & poissons', label: 'Viandes & poissons' },
+  { value: 'fruits & légumes', label: 'Fruits & légumes' },
+  { value: 'produits laitiers', label: 'Produits laitiers' },
+  { value: 'épicerie & sec', label: 'Épicerie & sec' },
+  { value: 'surgelés', label: 'Surgelés' },
+  { value: 'autre', label: 'Autre' },
+];
+
 interface IngredientFormProps {
   ingredient?: Ingredient | null;
   onSubmit: (data: {
@@ -17,6 +28,7 @@ interface IngredientFormProps {
     unit: UnitType;
     current_price?: number | null;
     supplier_name?: string | null;
+    category?: string | null;
   }) => void;
   onClose: () => void;
   isLoading?: boolean;
@@ -32,6 +44,7 @@ export default function IngredientForm({
   const [unit, setUnit] = useState<UnitType>('kg');
   const [price, setPrice] = useState('');
   const [supplier, setSupplier] = useState('');
+  const [category, setCategory] = useState('');
 
   useEffect(() => {
     if (ingredient) {
@@ -39,6 +52,7 @@ export default function IngredientForm({
       setUnit(ingredient.unit);
       setPrice(ingredient.current_price?.toString() ?? '');
       setSupplier(ingredient.supplier_name ?? '');
+      setCategory(ingredient.category ?? '');
     }
   }, [ingredient]);
 
@@ -49,6 +63,7 @@ export default function IngredientForm({
       unit,
       current_price: price ? parseFloat(price) : null,
       supplier_name: supplier.trim() || null,
+      category: category || null,
     });
   }
 
@@ -80,21 +95,40 @@ export default function IngredientForm({
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
-              Unité
-            </label>
-            <select
-              value={unit}
-              onChange={(e) => setUnit(e.target.value as UnitType)}
-              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
-            >
-              {UNITS.map((u) => (
-                <option key={u.value} value={u.value}>
-                  {u.label}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-stone-700 mb-1">
+                Unité
+              </label>
+              <select
+                value={unit}
+                onChange={(e) => setUnit(e.target.value as UnitType)}
+                className="w-full border border-stone-300 rounded-lg px-3 py-2 text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+              >
+                {UNITS.map((u) => (
+                  <option key={u.value} value={u.value}>
+                    {u.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-stone-700 mb-1">
+                Catégorie
+              </label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full border border-stone-300 rounded-lg px-3 py-2 text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>

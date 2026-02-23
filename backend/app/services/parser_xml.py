@@ -15,6 +15,7 @@ class InvoiceLine:
     unit_price: float | None = None
     total_price: float | None = None
     vat_percent: float | None = None
+    units_per_package: int | None = None
 
 
 @dataclass

@@ -19,6 +19,7 @@ import InvoiceUpload from './pages/InvoiceUpload';
 import InvoiceReview from './pages/InvoiceReview';
 import Alerts from './pages/Alerts';
 import Simulator from './pages/Simulator';
+import SimulatorHome from './pages/SimulatorHome';
 import Pricing from './pages/Pricing';
 import Settings from './pages/Settings';
 
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="/recipes/:id" element={<RecipeDetail />} />
             <Route path="/recipes/:id/edit" element={<RecipeEdit />} />
             <Route path="/recipes/:id/simulate" element={<Simulator />} />
+            <Route path="/simulator" element={<SimulatorHome />} />
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/invoices" element={<Invoices />} />

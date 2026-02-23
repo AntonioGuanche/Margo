@@ -15,6 +15,7 @@ export interface InvoiceLineResponse {
   unit: string | null;
   unit_price: number | null;
   total_price: number | null;
+  units_per_package: number | null;
   matched_ingredient_id: number | null;
   matched_ingredient_name: string | null;
   match_confidence: string;
@@ -74,6 +75,10 @@ interface InvoiceConfirmLine {
   add_to_recipe_id?: number;
   recipe_quantity?: number;
   recipe_unit?: string;
+  create_recipe_name?: string;
+  create_recipe_price?: number;
+  create_recipe_category?: string;
+  create_recipe_is_homemade?: boolean;
 }
 
 interface InvoiceConfirmResponse {
@@ -81,6 +86,7 @@ interface InvoiceConfirmResponse {
   ingredients_created: number;
   aliases_saved: number;
   recipes_recalculated: number;
+  recipes_created: number;
 }
 
 // --- Hooks ---

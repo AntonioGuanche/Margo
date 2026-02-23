@@ -28,6 +28,7 @@ interface LineState {
   unit: string | null;
   unit_price: number | null;
   total_price: number | null;
+  units_per_package: number | null;
   ingredient_id: number | null;
   create_ingredient_name: string | null;
   ignored: boolean;
@@ -37,9 +38,14 @@ interface LineState {
   add_to_recipe_id: number | null;
   recipe_quantity: number | null;
   recipe_unit: string | null;
+  create_recipe_name: string | null;
+  create_recipe_price: number | null;
+  create_recipe_category: string | null;
+  create_recipe_is_homemade: boolean;
 }
 
 const UNIT_OPTIONS = ['g', 'kg', 'cl', 'l', 'pce'];
+const RECIPE_CATEGORIES = ['entrée', 'plat', 'dessert', 'boisson', 'autre'];
 
 function ConfidenceBadge({ confidence }: { confidence: string }) {
   const styles = {
@@ -153,7 +159,7 @@ function LineRow({
                 step="0.01"
                 className="w-24 border border-stone-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <span className="self-center text-sm text-stone-400">\u20ac</span>
+              <span className="self-center text-sm text-stone-400">€</span>
             </div>
           ) : (
             <div className="flex gap-3 text-sm text-stone-500 mt-0.5">
@@ -162,10 +168,31 @@ function LineRow({
                   {line.quantity} {line.unit ?? ''}
                 </span>
               )}
-              {line.unit_price != null && <span>{line.unit_price.toFixed(2)} \u20ac/unit\u00e9</span>}
-              {line.total_price != null && <span>Total: {line.total_price.toFixed(2)} \u20ac</span>}
+              {line.unit_price != null && <span>{line.unit_price.toFixed(2)} €/unité</span>}
+              {line.total_price != null && <span>Total: {line.total_price.toFixed(2)} €</span>}
             </div>
           )}
+
+          {/* Conversion conditionnement → unités */}
+          {!line.is_manual &&
+            line.units_per_package != null &&
+            line.units_per_package > 0 &&
+            line.quantity != null &&
+            line.quantity > 0 && (
+              <div className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-1 flex items-center gap-1">
+                <span>💡</span>
+                <span>
+                  {line.quantity} {line.unit ?? 'colis'} × {line.units_per_package} ={' '}
+                  {Math.round(line.quantity * line.units_per_package)} unités
+                  {line.total_price != null && (
+                    <>
+                      {' '}
+                      → {(line.total_price / (line.quantity * line.units_per_package)).toFixed(2)} €/unité
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
@@ -206,7 +233,7 @@ function LineRow({
             onChange={handleSelectIngredient}
             className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
           >
-            <option value="">Choisir un ingr\u00e9dient...</option>
+            <option value="">Choisir un ingrédient...</option>
 
             {/* Suggestions from matching */}
             {line.suggestions.length > 0 && (
@@ -220,7 +247,7 @@ function LineRow({
             )}
 
             {/* All ingredients not in suggestions */}
-            <optgroup label="Tous les ingr\u00e9dients">
+            <optgroup label="Tous les ingrédients">
               {allIngredients
                 .filter((i) => !suggestionIds.has(i.id) && i.id !== matchedId)
                 .map((i) => (
@@ -230,7 +257,7 @@ function LineRow({
                 ))}
             </optgroup>
 
-            <option value="__create__">+ Cr\u00e9er un nouvel ingr\u00e9dient</option>
+            <option value="__create__">+ Créer un nouvel ingrédient</option>
             <option value="__ignore__">Ignorer cette ligne</option>
           </select>
 
@@ -241,14 +268,14 @@ function LineRow({
                 type="text"
                 value={newName}
                 onChange={(e) => handleCreateName(e.target.value)}
-                placeholder="Nom du nouvel ingr\u00e9dient"
+                placeholder="Nom du nouvel ingrédient"
                 className="flex-1 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
               />
               <Plus size={18} className="text-emerald-600 self-center" />
             </div>
           )}
 
-          {/* Add to recipe (T\u00e2che 3) */}
+          {/* Add to recipe / create recipe */}
           {(line.ingredient_id || line.create_ingredient_name) && (
             <>
               {!showRecipeLink ? (
@@ -257,13 +284,13 @@ function LineRow({
                   className="text-xs text-stone-500 hover:text-blue-600 flex items-center gap-1 mt-1"
                 >
                   <Link2 size={12} />
-                  Ajouter \u00e0 une recette
+                  Ajouter à une recette
                 </button>
               ) : (
                 <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-blue-700">
-                      Ajouter \u00e0 une recette
+                      Ajouter à une recette
                     </span>
                     <button
                       onClick={() => {
@@ -272,6 +299,10 @@ function LineRow({
                           add_to_recipe_id: null,
                           recipe_quantity: null,
                           recipe_unit: null,
+                          create_recipe_name: null,
+                          create_recipe_price: null,
+                          create_recipe_category: null,
+                          create_recipe_is_homemade: false,
                         });
                       }}
                       className="p-0.5 text-blue-400 hover:text-blue-600"
@@ -281,15 +312,34 @@ function LineRow({
                   </div>
 
                   <select
-                    value={line.add_to_recipe_id?.toString() ?? ''}
-                    onChange={(e) =>
-                      onChange({
-                        add_to_recipe_id: e.target.value ? parseInt(e.target.value, 10) : null,
-                      })
+                    value={
+                      line.create_recipe_name != null
+                        ? '__create__'
+                        : line.add_to_recipe_id?.toString() ?? ''
                     }
+                    onChange={(e) => {
+                      if (e.target.value === '__create__') {
+                        onChange({
+                          add_to_recipe_id: null,
+                          create_recipe_name: line.description,
+                          create_recipe_price: null,
+                          create_recipe_category: 'boisson',
+                          create_recipe_is_homemade: false,
+                        });
+                      } else {
+                        onChange({
+                          add_to_recipe_id: e.target.value ? parseInt(e.target.value, 10) : null,
+                          create_recipe_name: null,
+                          create_recipe_price: null,
+                          create_recipe_category: null,
+                          create_recipe_is_homemade: false,
+                        });
+                      }
+                    }}
                     className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Choisir une recette...</option>
+                    <option value="__create__">+ Créer un nouveau produit</option>
                     {recipesList.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.name}
@@ -297,31 +347,85 @@ function LineRow({
                     ))}
                   </select>
 
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      value={line.recipe_quantity ?? ''}
-                      onChange={(e) =>
-                        onChange({
-                          recipe_quantity: e.target.value ? parseFloat(e.target.value) : null,
-                        })
-                      }
-                      placeholder="Quantit\u00e9 par portion"
-                      step="0.1"
-                      className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <select
-                      value={line.recipe_unit ?? 'g'}
-                      onChange={(e) => onChange({ recipe_unit: e.target.value })}
-                      className="w-24 border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {UNIT_OPTIONS.map((u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Create new recipe form */}
+                  {line.create_recipe_name != null && (
+                    <div className="space-y-2 p-2 bg-white rounded-lg border border-blue-200">
+                      <input
+                        type="text"
+                        value={line.create_recipe_name}
+                        onChange={(e) => onChange({ create_recipe_name: e.target.value })}
+                        placeholder="Nom du produit"
+                        className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          value={line.create_recipe_price ?? ''}
+                          onChange={(e) =>
+                            onChange({
+                              create_recipe_price: e.target.value
+                                ? parseFloat(e.target.value)
+                                : null,
+                            })
+                          }
+                          placeholder="Prix de vente (€)"
+                          step="0.50"
+                          className="flex-1 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <select
+                          value={line.create_recipe_category ?? 'boisson'}
+                          onChange={(e) => onChange({ create_recipe_category: e.target.value })}
+                          className="w-28 border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          {RECIPE_CATEGORIES.map((c) => (
+                            <option key={c} value={c}>
+                              {c.charAt(0).toUpperCase() + c.slice(1)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <label className="flex items-center gap-2 text-sm text-stone-600">
+                        <input
+                          type="checkbox"
+                          checked={line.create_recipe_is_homemade}
+                          onChange={(e) =>
+                            onChange({ create_recipe_is_homemade: e.target.checked })
+                          }
+                          className="rounded border-stone-300 text-orange-600 focus:ring-orange-500"
+                        />
+                        Plat maison
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Quantity & unit for recipe association */}
+                  {(line.add_to_recipe_id || line.create_recipe_name) && (
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        value={line.recipe_quantity ?? ''}
+                        onChange={(e) =>
+                          onChange({
+                            recipe_quantity: e.target.value ? parseFloat(e.target.value) : null,
+                          })
+                        }
+                        placeholder="Quantité par portion"
+                        step="0.1"
+                        className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <select
+                        value={line.recipe_unit ?? 'g'}
+                        onChange={(e) => onChange({ recipe_unit: e.target.value })}
+                        className="w-24 border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {UNIT_OPTIONS.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -357,6 +461,7 @@ export default function InvoiceReview() {
         unit: l.unit,
         unit_price: l.unit_price,
         total_price: l.total_price,
+        units_per_package: l.units_per_package,
         ingredient_id: l.matched_ingredient_id,
         create_ingredient_name: null,
         ignored: false,
@@ -366,6 +471,10 @@ export default function InvoiceReview() {
         add_to_recipe_id: null,
         recipe_quantity: null,
         recipe_unit: null,
+        create_recipe_name: null,
+        create_recipe_price: null,
+        create_recipe_category: null,
+        create_recipe_is_homemade: false,
       })),
     );
     setEditSupplier(invoice.supplier_name ?? '');
@@ -382,7 +491,7 @@ export default function InvoiceReview() {
       {
         onSuccess: () =>
           toast.success(
-            field === 'supplier_name' ? 'Fournisseur mis \u00e0 jour' : 'Date mise \u00e0 jour',
+            field === 'supplier_name' ? 'Fournisseur mis à jour' : 'Date mise à jour',
           ),
         onError: (err) => toast.error(err.message),
       },
@@ -408,6 +517,7 @@ export default function InvoiceReview() {
         unit: null,
         unit_price: null,
         total_price: null,
+        units_per_package: null,
         ingredient_id: null,
         create_ingredient_name: null,
         ignored: false,
@@ -417,6 +527,10 @@ export default function InvoiceReview() {
         add_to_recipe_id: null,
         recipe_quantity: null,
         recipe_unit: null,
+        create_recipe_name: null,
+        create_recipe_price: null,
+        create_recipe_category: null,
+        create_recipe_is_homemade: false,
       },
     ]);
   }, []);
@@ -441,12 +555,16 @@ export default function InvoiceReview() {
         add_to_recipe_id: l.add_to_recipe_id ?? undefined,
         recipe_quantity: l.recipe_quantity ?? undefined,
         recipe_unit: l.recipe_unit ?? undefined,
+        create_recipe_name: l.create_recipe_name ?? undefined,
+        create_recipe_price: l.create_recipe_price ?? undefined,
+        create_recipe_category: l.create_recipe_category ?? undefined,
+        create_recipe_is_homemade: l.create_recipe_name ? l.create_recipe_is_homemade : undefined,
       }));
 
     confirm.mutate(confirmLines, {
       onSuccess: (data) => {
         setShowResult(true);
-        toast.success(`Facture confirm\u00e9e \u2014 ${data.prices_updated} prix mis \u00e0 jour \u2705`);
+        toast.success(`Facture confirmée — ${data.prices_updated} prix mis à jour ✅`);
       },
       onError: (err) => toast.error(err.message),
     });
@@ -471,30 +589,39 @@ export default function InvoiceReview() {
         <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <Check size={32} className="text-emerald-600" />
         </div>
-        <h2 className="text-xl font-semibold text-stone-900 mb-4">Facture confirm\u00e9e !</h2>
+        <h2 className="text-xl font-semibold text-stone-900 mb-4">Facture confirmée !</h2>
         <div className="bg-white rounded-xl border border-stone-200 p-6 text-left space-y-2 mb-6 max-w-sm mx-auto">
           <p className="text-sm text-stone-600">
             <span className="font-semibold text-stone-900">{confirm.data.prices_updated}</span> prix
-            mis \u00e0 jour
+            mis à jour
           </p>
           <p className="text-sm text-stone-600">
             <span className="font-semibold text-stone-900">
               {confirm.data.ingredients_created}
             </span>{' '}
-            ingr\u00e9dient{confirm.data.ingredients_created > 1 ? 's' : ''} cr\u00e9\u00e9
+            ingrédient{confirm.data.ingredients_created > 1 ? 's' : ''} créé
             {confirm.data.ingredients_created > 1 ? 's' : ''}
           </p>
           <p className="text-sm text-stone-600">
             <span className="font-semibold text-stone-900">{confirm.data.aliases_saved}</span> alias
-            m\u00e9moris\u00e9{confirm.data.aliases_saved > 1 ? 's' : ''}
+            mémorisé{confirm.data.aliases_saved > 1 ? 's' : ''}
           </p>
           <p className="text-sm text-stone-600">
             <span className="font-semibold text-stone-900">
               {confirm.data.recipes_recalculated}
             </span>{' '}
-            recette{confirm.data.recipes_recalculated > 1 ? 's' : ''} recalcul\u00e9e
+            recette{confirm.data.recipes_recalculated > 1 ? 's' : ''} recalculée
             {confirm.data.recipes_recalculated > 1 ? 's' : ''}
           </p>
+          {confirm.data.recipes_created > 0 && (
+            <p className="text-sm text-stone-600">
+              <span className="font-semibold text-stone-900">
+                {confirm.data.recipes_created}
+              </span>{' '}
+              produit{confirm.data.recipes_created > 1 ? 's' : ''} créé
+              {confirm.data.recipes_created > 1 ? 's' : ''}
+            </p>
+          )}
         </div>
         <button
           onClick={() => navigate('/invoices')}
@@ -520,10 +647,10 @@ export default function InvoiceReview() {
       {/* Header */}
       <h2 className="text-xl font-semibold text-stone-900 mb-1 flex items-center gap-2">
         <FileCheck size={22} className="text-orange-700" />
-        V\u00e9rifier la facture
+        Vérifier la facture
       </h2>
 
-      {/* Invoice metadata \u2014 editable supplier & date */}
+      {/* Invoice metadata — editable supplier & date */}
       <div className="bg-white rounded-xl border border-stone-200 p-4 mb-4">
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
@@ -556,7 +683,7 @@ export default function InvoiceReview() {
           {invoice.total_amount != null && (
             <div>
               <span className="text-stone-500">Montant total</span>
-              <p className="font-medium text-stone-900">{invoice.total_amount.toFixed(2)} \u20ac</p>
+              <p className="font-medium text-stone-900">{invoice.total_amount.toFixed(2)} €</p>
             </div>
           )}
           <div>
@@ -602,7 +729,7 @@ export default function InvoiceReview() {
             className="flex items-center gap-1 text-sm text-stone-400 hover:text-stone-600 mb-2"
           >
             {showIgnored ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            Lignes ignor\u00e9es ({ignoredLines.length})
+            Lignes ignorées ({ignoredLines.length})
           </button>
           {showIgnored && (
             <div className="space-y-2">

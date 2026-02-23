@@ -32,6 +32,7 @@ from app.services.alerts import check_and_create_alerts
 from app.services.costing import recalculate_recipes_for_ingredient
 from app.services.invoice_router import parse_invoice_file
 from app.services.matching import match_invoice_lines, save_alias
+from app.services.utils import guess_ingredient_category
 from app.services.storage import save_upload
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ def _build_line_responses(match_results: list) -> list[dict]:
             "total_price": mr.invoice_line.total_price,
             "matched_ingredient_id": mr.matched_ingredient_id,
             "matched_ingredient_name": mr.matched_ingredient_name,
+            "units_per_package": mr.invoice_line.units_per_package,
             "match_confidence": mr.confidence,
             "suggestions": mr.suggestions,
         })
@@ -152,6 +154,7 @@ async def upload_invoice(
             unit=ld["unit"],
             unit_price=ld["unit_price"],
             total_price=ld["total_price"],
+            units_per_package=ld.get("units_per_package"),
             matched_ingredient_id=ld["matched_ingredient_id"],
             matched_ingredient_name=ld["matched_ingredient_name"],
             match_confidence=ld["match_confidence"],
@@ -248,6 +251,7 @@ async def get_invoice(
                 unit=ld.get("unit"),
                 unit_price=ld.get("unit_price"),
                 total_price=ld.get("total_price"),
+                units_per_package=ld.get("units_per_package"),
                 matched_ingredient_id=ld.get("matched_ingredient_id"),
                 matched_ingredient_name=ld.get("matched_ingredient_name"),
                 match_confidence=ld.get("match_confidence", "none"),
@@ -300,6 +304,7 @@ async def confirm_invoice(
     prices_updated = 0
     ingredients_created = 0
     aliases_saved = 0
+    recipes_created = 0
     affected_ingredient_ids: set[int] = set()
     # Track old→new prices for alert generation
     price_changes: list[tuple[int, float | None, float]] = []  # (ingredient_id, old_price, new_price)
@@ -319,6 +324,7 @@ async def confirm_invoice(
                 unit=line.unit or "kg",
                 current_price=line.unit_price,
                 supplier_name=invoice.supplier_name,
+                category=guess_ingredient_category(line.create_ingredient_name),
                 last_updated=dt.datetime.utcnow(),
             )
             db.add(new_ingredient)
@@ -390,6 +396,28 @@ async def confirm_invoice(
                     db.add(ri)
                     affected_ingredient_ids.add(ingredient_id)
 
+        # Create a new recipe/product if requested
+        if line.create_recipe_name and ingredient_id:
+            new_recipe = Recipe(
+                restaurant_id=restaurant.id,
+                name=line.create_recipe_name,
+                selling_price=line.create_recipe_price or 0,
+                category=line.create_recipe_category,
+                is_homemade=line.create_recipe_is_homemade,
+            )
+            db.add(new_recipe)
+            await db.flush()
+
+            ri = RecipeIngredient(
+                recipe_id=new_recipe.id,
+                ingredient_id=ingredient_id,
+                quantity=line.recipe_quantity or 1,
+                unit=line.recipe_unit or "pce",
+            )
+            db.add(ri)
+            affected_ingredient_ids.add(ingredient_id)
+            recipes_created += 1
+
     # Cascade recalculate all affected recipes
     recipes_recalculated = 0
     for ing_id in affected_ingredient_ids:
@@ -420,6 +448,7 @@ async def confirm_invoice(
         ingredients_created=ingredients_created,
         aliases_saved=aliases_saved,
         recipes_recalculated=recipes_recalculated,
+        recipes_created=recipes_created,
     )
 
 
@@ -468,6 +497,7 @@ async def patch_invoice(
                 unit=ld.get("unit"),
                 unit_price=ld.get("unit_price"),
                 total_price=ld.get("total_price"),
+                units_per_package=ld.get("units_per_package"),
                 matched_ingredient_id=ld.get("matched_ingredient_id"),
                 matched_ingredient_name=ld.get("matched_ingredient_name"),
                 match_confidence=ld.get("match_confidence", "none"),

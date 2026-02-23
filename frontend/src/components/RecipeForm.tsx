@@ -247,12 +247,12 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
           </label>
           <div>
             <span className="text-sm font-medium text-stone-900">
-              {isHomemade ? 'Plat maison' : 'Produit achet\u00e9'}
+              {isHomemade ? 'Plat maison' : 'Produit acheté'}
             </span>
             <p className="text-xs text-stone-500">
               {isHomemade
-                ? 'Avec sous-ingr\u00e9dients et quantit\u00e9s'
-                : 'Marge directe : prix d\u2019achat vs prix de vente'}
+                ? 'Avec sous-ingrédients et quantités'
+                : 'Marge directe : prix d’achat vs prix de vente'}
             </p>
           </div>
         </div>
@@ -260,16 +260,16 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
         {/* Bought product: simple ingredient picker */}
         {!isHomemade && (
           <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">Ingr\u00e9dient li\u00e9 (produit achet\u00e9)</label>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Ingrédient lié (produit acheté)</label>
             <select
               value={linkedIngredientId ?? ''}
               onChange={(e) => setLinkedIngredientId(e.target.value ? parseInt(e.target.value) : null)}
               className="w-full border border-stone-300 rounded-lg px-3 py-2 text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
             >
-              <option value="">Choisir un ingr\u00e9dient...</option>
+              <option value="">Choisir un ingrédient...</option>
               {ingredientsList?.items.map((ing) => (
                 <option key={ing.id} value={ing.id}>
-                  {ing.name}{ing.current_price != null ? ` \u2014 ${ing.current_price.toFixed(2)} \u20ac` : ''}
+                  {ing.name}{ing.current_price != null ? ` — ${ing.current_price.toFixed(2)} €` : ''}
                 </option>
               ))}
             </select>
@@ -277,10 +277,10 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
               const linked = ingredientsMap.get(linkedIngredientId);
               return linked?.current_price != null ? (
                 <p className="text-sm text-stone-500 mt-1">
-                  Prix d\u2019achat : <span className="font-semibold text-stone-900">{linked.current_price.toFixed(2)} \u20ac</span>
+                  Prix d’achat : <span className="font-semibold text-stone-900">{linked.current_price.toFixed(2)} €</span>
                 </p>
               ) : (
-                <p className="text-sm text-stone-400 mt-1">Pas encore de prix d\u2019achat</p>
+                <p className="text-sm text-stone-400 mt-1">Pas encore de prix d’achat</p>
               );
             })()}
           </div>
@@ -288,7 +288,7 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
 
         {/* Ingredients (homemade only) */}
         {isHomemade && <div>
-          <label className="block text-sm font-medium text-stone-700 mb-2">Ingr\u00e9dients</label>
+          <label className="block text-sm font-medium text-stone-700 mb-2">Ingrédients</label>
           <div className="space-y-2">
             {lines.map((line, index) => {
               const ing = line.ingredient_id ? ingredientsMap.get(line.ingredient_id) : null;

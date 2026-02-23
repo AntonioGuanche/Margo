@@ -13,6 +13,7 @@ class IngredientCreate(BaseModel):
     unit: UnitType
     current_price: float | None = None
     supplier_name: str | None = None
+    category: str | None = None
 
 
 class IngredientUpdate(BaseModel):
@@ -20,6 +21,7 @@ class IngredientUpdate(BaseModel):
     unit: UnitType | None = None
     current_price: float | None = None
     supplier_name: str | None = None
+    category: str | None = None
 
 
 class IngredientResponse(BaseModel):
@@ -30,6 +32,7 @@ class IngredientResponse(BaseModel):
     unit: str
     current_price: float | None
     supplier_name: str | None
+    category: str | None = None
     last_updated: datetime | None
     created_at: datetime
 

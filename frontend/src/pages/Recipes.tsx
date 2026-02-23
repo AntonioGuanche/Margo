@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, ChefHat, Camera } from 'lucide-react';
+import { Plus, Search, BookOpen, Camera, ChevronDown, ChevronRight } from 'lucide-react';
 import { useRecipes } from '../hooks/useRecipes';
 import { usePlanInfo } from '../hooks/useBilling';
 import { SkeletonList } from '../components/Skeleton';
@@ -12,6 +12,22 @@ const STATUS_COLORS = {
   orange: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
   red: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
 } as const;
+
+const CATEGORY_ORDER = ['entrée', 'plat', 'dessert', 'boisson', 'autre'];
+
+function groupByCategory(recipes: RecipeListItem[]) {
+  const groups: Record<string, RecipeListItem[]> = {};
+  for (const r of recipes) {
+    const cat = r.category?.toLowerCase() || 'autre';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(r);
+  }
+  return Object.entries(groups).sort(([a], [b]) => {
+    const ia = CATEGORY_ORDER.indexOf(a);
+    const ib = CATEGORY_ORDER.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+}
 
 function RecipeCard({ recipe, onClick }: { recipe: RecipeListItem; onClick: () => void }) {
   const colors = STATUS_COLORS[recipe.margin_status];
@@ -28,11 +44,10 @@ function RecipeCard({ recipe, onClick }: { recipe: RecipeListItem; onClick: () =
               ? 'bg-orange-50 text-orange-700'
               : 'bg-stone-100 text-stone-500'
           }`}>
-            {recipe.is_homemade ? 'Maison' : 'Achet\u00e9'}
+            {recipe.is_homemade ? 'Maison' : 'Acheté'}
           </span>
         </div>
         <div className="text-sm text-stone-500 flex gap-3 mt-0.5">
-          {recipe.category && <span>{recipe.category}</span>}
           <span>{recipe.selling_price.toFixed(2)} €</span>
         </div>
       </div>
@@ -56,6 +71,7 @@ export default function Recipes() {
   const { data, isLoading } = useRecipes(search || undefined);
   const { data: planInfo } = usePlanInfo();
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const atLimit =
     planInfo?.max_recipes !== null &&
@@ -70,14 +86,21 @@ export default function Recipes() {
     navigate('/recipes/new');
   }
 
+  const recipes = data?.items ?? [];
+  const grouped = groupByCategory(recipes);
+
+  const toggleCategory = (cat: string) => {
+    setCollapsed((prev) => ({ ...prev, [cat]: !prev[cat] }));
+  };
+
   return (
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <h2 className="text-xl font-semibold text-stone-900 flex items-center gap-2">
-            <ChefHat size={22} className="text-orange-700" />
-            Recettes
+            <BookOpen size={22} className="text-orange-700" />
+            Ma carte
           </h2>
           {planInfo?.max_recipes !== null && planInfo?.max_recipes !== undefined && (
             <span className="text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">
@@ -107,20 +130,20 @@ export default function Recipes() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full border border-stone-300 rounded-lg pl-10 pr-3 py-2 text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
-          placeholder="Rechercher une recette..."
+          placeholder="Rechercher un plat..."
         />
       </div>
 
-      {/* List */}
+      {/* List grouped by category */}
       {isLoading ? (
         <SkeletonList count={5} />
-      ) : !data?.items.length ? (
+      ) : recipes.length === 0 ? (
         <div className="bg-white rounded-xl border border-stone-200 p-8 text-center">
-          <ChefHat size={40} className="mx-auto text-stone-300 mb-3" />
+          <BookOpen size={40} className="mx-auto text-stone-300 mb-3" />
           <p className="text-stone-600 font-medium mb-1">
             {search
-              ? `Aucune recette trouvée pour « ${search} »`
-              : 'Aucune recette'}
+              ? `Aucun plat trouvé pour « ${search} »`
+              : 'Aucun plat sur ta carte'}
           </p>
           {!search && (
             <>
@@ -138,16 +161,54 @@ export default function Recipes() {
           )}
         </div>
       ) : (
-        <div className="space-y-2">
-          {data.items.map((recipe) => (
-            <RecipeCard
-              key={recipe.id}
-              recipe={recipe}
-              onClick={() => navigate(`/recipes/${recipe.id}`)}
-            />
-          ))}
+        <div className="space-y-4">
+          {grouped.map(([category, items], idx) => {
+            const isCollapsed = collapsed[category] ?? (idx > 0);
+            const avgCost =
+              items.filter((r) => r.food_cost_percent != null).length > 0
+                ? items
+                    .filter((r) => r.food_cost_percent != null)
+                    .reduce((sum, r) => sum + (r.food_cost_percent ?? 0), 0) /
+                  items.filter((r) => r.food_cost_percent != null).length
+                : null;
+
+            return (
+              <div key={category}>
+                <button
+                  onClick={() => toggleCategory(category)}
+                  className="flex items-center gap-2 w-full text-left mb-2"
+                >
+                  {isCollapsed ? (
+                    <ChevronRight size={14} className="text-stone-400" />
+                  ) : (
+                    <ChevronDown size={14} className="text-stone-400" />
+                  )}
+                  <span className="text-xs font-semibold text-stone-500 uppercase tracking-wide">
+                    {category} ({items.length})
+                  </span>
+                  {avgCost != null && (
+                    <span className="text-xs text-stone-400">
+                      — moy. {avgCost.toFixed(1)}%
+                    </span>
+                  )}
+                </button>
+
+                {!isCollapsed && (
+                  <div className="space-y-2">
+                    {items.map((recipe) => (
+                      <RecipeCard
+                        key={recipe.id}
+                        recipe={recipe}
+                        onClick={() => navigate(`/recipes/${recipe.id}`)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           <p className="text-sm text-stone-400 text-center pt-2">
-            {data.total} recette{data.total > 1 ? 's' : ''}
+            {data?.total ?? 0} plat{(data?.total ?? 0) > 1 ? 's' : ''}
           </p>
         </div>
       )}

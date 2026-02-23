@@ -91,6 +91,7 @@ async def create_ingredient(
         unit=data.unit,
         current_price=data.current_price,
         supplier_name=data.supplier_name,
+        category=data.category,
         last_updated=func.now() if data.current_price is not None else None,
     )
 

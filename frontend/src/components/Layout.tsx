@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   UtensilsCrossed,
   LayoutDashboard,
-  ChefHat,
+  BookOpen,
   FileText,
   LogOut,
   Bell,
@@ -78,7 +78,7 @@ export default function Layout() {
           to="/"
           className="text-xl font-bold text-orange-700 hover:text-orange-800 transition-colors"
         >
-          Marg\u00f3
+          Margó
         </NavLink>
 
         <div className="flex items-center gap-1">
@@ -98,14 +98,14 @@ export default function Layout() {
           <button
             onClick={() => navigate('/settings')}
             className="text-stone-500 hover:text-stone-700 p-2 md:hidden"
-            title="Param\u00e8tres"
+            title="Paramètres"
           >
             <Settings size={20} />
           </button>
           <button
             onClick={handleLogout}
             className="text-stone-500 hover:text-stone-700 p-2"
-            title="D\u00e9connexion"
+            title="Déconnexion"
           >
             <LogOut size={20} />
           </button>
@@ -118,8 +118,8 @@ export default function Layout() {
         <aside className="hidden md:flex md:flex-col md:w-[220px] bg-white border-r border-stone-200 p-3 shrink-0">
           <nav className="flex flex-col gap-1 flex-1">
             <SidebarLink to="/" icon={LayoutDashboard} label="Dashboard" end />
-            <SidebarLink to="/recipes" icon={ChefHat} label="Recettes" />
-            <SidebarLink to="/ingredients" icon={UtensilsCrossed} label="Ingr\u00e9dients" />
+            <SidebarLink to="/recipes" icon={BookOpen} label="Ma carte" />
+            <SidebarLink to="/ingredients" icon={UtensilsCrossed} label="Ingrédients" />
             <SidebarLink
               to="/invoices"
               icon={FileText}
@@ -132,7 +132,7 @@ export default function Layout() {
 
           {/* Settings pinned to bottom */}
           <div className="border-t border-stone-200 pt-2 mt-2">
-            <SidebarLink to="/settings" icon={Settings} label="Param\u00e8tres" />
+            <SidebarLink to="/settings" icon={Settings} label="Paramètres" />
           </div>
         </aside>
 
@@ -160,8 +160,8 @@ export default function Layout() {
             `flex flex-col items-center text-xs ${isActive ? 'text-orange-700' : 'text-stone-400'}`
           }
         >
-          <ChefHat size={20} />
-          <span>Recettes</span>
+          <BookOpen size={20} />
+          <span>Ma carte</span>
         </NavLink>
         <NavLink
           to="/invoices"
@@ -186,7 +186,7 @@ export default function Layout() {
           }
         >
           <UtensilsCrossed size={20} />
-          <span>Ingr\u00e9dients</span>
+          <span>Ingrédients</span>
         </NavLink>
         <NavLink
           to="/simulator"
