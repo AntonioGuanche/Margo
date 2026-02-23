@@ -82,6 +82,13 @@ class InvoiceListResponse(BaseModel):
     total: int
 
 
+# --- Patch ---
+
+class InvoicePatchRequest(BaseModel):
+    supplier_name: str | None = None
+    invoice_date: str | None = None  # YYYY-MM-DD
+
+
 # --- Detail ---
 
 class InvoiceDetailResponse(BaseModel):

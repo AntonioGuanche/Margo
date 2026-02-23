@@ -34,6 +34,8 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
   const [sellingPrice, setSellingPrice] = useState('');
   const [category, setCategory] = useState('');
   const [targetMargin, setTargetMargin] = useState('');
+  const [isHomemade, setIsHomemade] = useState(true);
+  const [linkedIngredientId, setLinkedIngredientId] = useState<number | null>(null);
   const [lines, setLines] = useState<IngredientLine[]>([
     { ingredient_id: null, quantity: '', unit: 'kg' },
   ]);
@@ -45,6 +47,10 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
       setSellingPrice(existingRecipe.selling_price.toString());
       setCategory(existingRecipe.category ?? '');
       setTargetMargin(existingRecipe.target_margin?.toString() ?? '');
+      setIsHomemade(existingRecipe.is_homemade);
+      if (!existingRecipe.is_homemade && existingRecipe.ingredients.length > 0) {
+        setLinkedIngredientId(existingRecipe.ingredients[0].ingredient_id);
+      }
       setLines(
         existingRecipe.ingredients.map((ri) => ({
           ingredient_id: ri.ingredient_id,
@@ -65,12 +71,18 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
   }
 
   // Live food cost calculation
-  const totalCost = lines.reduce((sum, line) => {
-    if (!line.ingredient_id) return sum;
-    const ing = ingredientsMap.get(line.ingredient_id);
-    const lineCost = calculateLineCost(line.quantity, ing?.current_price ?? line.unit_cost);
-    return sum + (lineCost ?? 0);
-  }, 0);
+  let totalCost = 0;
+  if (isHomemade) {
+    totalCost = lines.reduce((sum, line) => {
+      if (!line.ingredient_id) return sum;
+      const ing = ingredientsMap.get(line.ingredient_id);
+      const lineCost = calculateLineCost(line.quantity, ing?.current_price ?? line.unit_cost);
+      return sum + (lineCost ?? 0);
+    }, 0);
+  } else if (linkedIngredientId) {
+    const linkedIng = ingredientsMap.get(linkedIngredientId);
+    totalCost = linkedIng?.current_price ?? 0;
+  }
 
   const sp = parseFloat(sellingPrice);
   const foodCostPercent = sp > 0 && totalCost > 0 ? (totalCost / sp) * 100 : null;
@@ -104,22 +116,31 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const validLines = lines.filter(
-      (l) => l.ingredient_id !== null && l.quantity && parseFloat(l.quantity) > 0,
-    );
+    let ingredients: { ingredient_id: number; quantity: number; unit: string }[] = [];
 
-    if (validLines.length === 0) return;
+    if (isHomemade) {
+      const validLines = lines.filter(
+        (l) => l.ingredient_id !== null && l.quantity && parseFloat(l.quantity) > 0,
+      );
+      if (validLines.length === 0) return;
+      ingredients = validLines.map((l) => ({
+        ingredient_id: l.ingredient_id!,
+        quantity: parseFloat(l.quantity),
+        unit: l.unit,
+      }));
+    } else if (linkedIngredientId) {
+      // Bought product: link single ingredient with quantity=1
+      const linkedIng = ingredientsMap.get(linkedIngredientId);
+      ingredients = [{ ingredient_id: linkedIngredientId, quantity: 1, unit: linkedIng?.unit ?? 'piece' }];
+    }
 
     const payload = {
       name: name.trim(),
       selling_price: parseFloat(sellingPrice),
       category: category || null,
       target_margin: targetMargin ? parseFloat(targetMargin) : null,
-      ingredients: validLines.map((l) => ({
-        ingredient_id: l.ingredient_id!,
-        quantity: parseFloat(l.quantity),
-        unit: l.unit,
-      })),
+      is_homemade: isHomemade,
+      ingredients,
     };
 
     if (recipeId) {
@@ -213,9 +234,61 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
           />
         </div>
 
-        {/* Ingredients */}
-        <div>
-          <label className="block text-sm font-medium text-stone-700 mb-2">Ingrédients</label>
+        {/* Homemade toggle */}
+        <div className="flex items-center gap-3 bg-stone-50 rounded-lg p-3">
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isHomemade}
+              onChange={(e) => setIsHomemade(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-9 h-5 bg-stone-300 peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:bg-orange-600 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+          </label>
+          <div>
+            <span className="text-sm font-medium text-stone-900">
+              {isHomemade ? 'Plat maison' : 'Produit achet\u00e9'}
+            </span>
+            <p className="text-xs text-stone-500">
+              {isHomemade
+                ? 'Avec sous-ingr\u00e9dients et quantit\u00e9s'
+                : 'Marge directe : prix d\u2019achat vs prix de vente'}
+            </p>
+          </div>
+        </div>
+
+        {/* Bought product: simple ingredient picker */}
+        {!isHomemade && (
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Ingr\u00e9dient li\u00e9 (produit achet\u00e9)</label>
+            <select
+              value={linkedIngredientId ?? ''}
+              onChange={(e) => setLinkedIngredientId(e.target.value ? parseInt(e.target.value) : null)}
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+            >
+              <option value="">Choisir un ingr\u00e9dient...</option>
+              {ingredientsList?.items.map((ing) => (
+                <option key={ing.id} value={ing.id}>
+                  {ing.name}{ing.current_price != null ? ` \u2014 ${ing.current_price.toFixed(2)} \u20ac` : ''}
+                </option>
+              ))}
+            </select>
+            {linkedIngredientId && (() => {
+              const linked = ingredientsMap.get(linkedIngredientId);
+              return linked?.current_price != null ? (
+                <p className="text-sm text-stone-500 mt-1">
+                  Prix d\u2019achat : <span className="font-semibold text-stone-900">{linked.current_price.toFixed(2)} \u20ac</span>
+                </p>
+              ) : (
+                <p className="text-sm text-stone-400 mt-1">Pas encore de prix d\u2019achat</p>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Ingredients (homemade only) */}
+        {isHomemade && <div>
+          <label className="block text-sm font-medium text-stone-700 mb-2">Ingr\u00e9dients</label>
           <div className="space-y-2">
             {lines.map((line, index) => {
               const ing = line.ingredient_id ? ingredientsMap.get(line.ingredient_id) : null;
@@ -286,7 +359,7 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
             <Plus size={16} />
             Ajouter un ingrédient
           </button>
-        </div>
+        </div>}
 
         {/* Live food cost preview */}
         {totalCost > 0 && (
@@ -321,7 +394,7 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
         {/* Submit */}
         <button
           type="submit"
-          disabled={isLoading || !name.trim() || !sellingPrice || lines.every((l) => !l.ingredient_id)}
+          disabled={isLoading || !name.trim() || !sellingPrice || (isHomemade && lines.every((l) => !l.ingredient_id))}
           className="w-full bg-orange-700 text-white py-2.5 rounded-lg font-medium hover:bg-orange-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isLoading ? 'Enregistrement...' : recipeId ? 'Modifier' : 'Créer la recette'}

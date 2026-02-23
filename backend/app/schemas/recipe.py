@@ -28,7 +28,8 @@ class RecipeCreate(BaseModel):
     selling_price: float = Field(gt=0)
     category: str | None = None
     target_margin: float | None = None
-    ingredients: list[RecipeIngredientCreate] = Field(min_length=1)
+    is_homemade: bool = True
+    ingredients: list[RecipeIngredientCreate] = Field(default_factory=list)
 
 
 class RecipeUpdate(BaseModel):
@@ -36,6 +37,7 @@ class RecipeUpdate(BaseModel):
     selling_price: float | None = Field(default=None, gt=0)
     category: str | None = None
     target_margin: float | None = None
+    is_homemade: bool | None = None
     ingredients: list[RecipeIngredientCreate] | None = None
 
 
@@ -49,6 +51,7 @@ class RecipeResponse(BaseModel):
     target_margin: float | None
     food_cost: float | None
     food_cost_percent: float | None
+    is_homemade: bool
     margin_status: str
     ingredients: list[RecipeIngredientResponse] = []
     created_at: datetime
@@ -64,6 +67,7 @@ class RecipeListItem(BaseModel):
     target_margin: float | None
     food_cost: float | None
     food_cost_percent: float | None
+    is_homemade: bool
     margin_status: str
     created_at: datetime
 

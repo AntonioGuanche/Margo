@@ -21,6 +21,7 @@ export interface RecipeListItem {
   target_margin: number | null;
   food_cost: number | null;
   food_cost_percent: number | null;
+  is_homemade: boolean;
   margin_status: MarginStatus;
   created_at: string;
 }
@@ -54,6 +55,7 @@ interface RecipeCreate {
   selling_price: number;
   category?: string | null;
   target_margin?: number | null;
+  is_homemade?: boolean;
   ingredients: RecipeIngredientInput[];
 }
 
@@ -62,6 +64,7 @@ interface RecipeUpdate {
   selling_price?: number;
   category?: string | null;
   target_margin?: number | null;
+  is_homemade?: boolean;
   ingredients?: RecipeIngredientInput[];
 }
 

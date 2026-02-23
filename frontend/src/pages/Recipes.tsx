@@ -21,7 +21,16 @@ function RecipeCard({ recipe, onClick }: { recipe: RecipeListItem; onClick: () =
       className="w-full bg-white rounded-xl border border-stone-200 px-4 py-3 flex items-center justify-between hover:border-stone-300 transition-colors text-left"
     >
       <div className="min-w-0 flex-1">
-        <div className="font-medium text-stone-900 truncate">{recipe.name}</div>
+        <div className="font-medium text-stone-900 truncate flex items-center gap-1.5">
+          {recipe.name}
+          <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+            recipe.is_homemade
+              ? 'bg-orange-50 text-orange-700'
+              : 'bg-stone-100 text-stone-500'
+          }`}>
+            {recipe.is_homemade ? 'Maison' : 'Achet\u00e9'}
+          </span>
+        </div>
         <div className="text-sm text-stone-500 flex gap-3 mt-0.5">
           {recipe.category && <span>{recipe.category}</span>}
           <span>{recipe.selling_price.toFixed(2)} €</span>

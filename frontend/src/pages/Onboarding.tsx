@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Upload, Plus, Trash2, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Camera, Upload, Plus, Trash2, Check, ChevronDown, ChevronUp, FileText, Loader2 } from 'lucide-react';
 import {
   useExtractMenu,
   useSuggestIngredients,
@@ -12,7 +12,7 @@ const CATEGORIES = ['entrée', 'plat', 'dessert', 'boisson', 'autre'];
 const UNITS = ['g', 'kg', 'cl', 'l', 'piece'];
 
 function Stepper({ currentStep }: { currentStep: number }) {
-  const steps = ['Photo', 'Plats', 'Ingrédients', 'Terminé'];
+  const steps = ['Menu', 'Plats', 'Ingrédients', 'Terminé'];
   return (
     <div className="flex items-center justify-center mb-6">
       {steps.map((label, i) => (
@@ -44,95 +44,108 @@ function Stepper({ currentStep }: { currentStep: number }) {
   );
 }
 
-// ----- Step 1: Photo -----
-function StepPhoto({
+// ----- Step 1: Menu (drag & drop / photo / file picker — auto-extract) -----
+function StepMenu({
   onExtracted,
 }: {
   onExtracted: (dishes: ExtractedDish[], imageSrc: string) => void;
 }) {
-  const [preview, setPreview] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const extractMutation = useExtractMenu();
 
-  function handleFile(f: File) {
-    setFile(f);
-    const reader = new FileReader();
-    reader.onload = (e) => setPreview(e.target?.result as string);
-    reader.readAsDataURL(f);
-  }
+  const processFile = useCallback(
+    (f: File) => {
+      // Auto-extract immediately
+      extractMutation.mutate(f, {
+        onSuccess: (data) => {
+          // Generate preview for images, use placeholder for PDFs
+          if (f.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => onExtracted(data.dishes, e.target?.result as string);
+            reader.readAsDataURL(f);
+          } else {
+            onExtracted(data.dishes, '');
+          }
+        },
+      });
+    },
+    [extractMutation, onExtracted],
+  );
 
-  function handleExtract() {
-    if (!file) return;
-    extractMutation.mutate(file, {
-      onSuccess: (data) => onExtracted(data.dishes, preview!),
-    });
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const f = e.dataTransfer.files[0];
+      if (f) processFile(f);
+    },
+    [processFile],
+  );
+
+  // Loading state
+  if (extractMutation.isPending) {
+    return (
+      <div className="space-y-4 text-center py-8">
+        <Loader2 size={48} className="text-orange-700 animate-spin mx-auto" />
+        <h3 className="text-lg font-semibold text-stone-900">Extraction en cours...</h3>
+        <p className="text-sm text-stone-500">L'IA analyse votre carte et extrait les plats</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-stone-900 text-center">
-        Photographiez votre carte
+        Importez votre carte
       </h3>
       <p className="text-sm text-stone-500 text-center">
-        L'IA va extraire tous les plats avec leurs prix
+        Photo, PDF ou image — l'IA extrait les plats automatiquement
       </p>
 
-      {preview ? (
-        <div className="relative">
-          <img src={preview} alt="Menu" className="w-full rounded-xl border border-stone-200" />
-          <button
-            onClick={() => { setPreview(null); setFile(null); }}
-            className="absolute top-2 right-2 bg-white/90 rounded-full p-1.5 text-stone-600 hover:text-red-600"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <button
-            onClick={() => cameraInputRef.current?.click()}
-            className="w-full bg-orange-700 text-white py-4 rounded-xl font-medium hover:bg-orange-800 transition-colors flex items-center justify-center gap-2 text-lg"
-          >
-            <Camera size={24} />
-            Photographier ma carte
-          </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full bg-white text-stone-700 py-3 rounded-xl font-medium border border-stone-300 hover:border-stone-400 transition-colors flex items-center justify-center gap-2"
-          >
-            <Upload size={18} />
-            Choisir un fichier
-          </button>
-        </div>
-      )}
+      {/* Drag & drop zone */}
+      <div
+        onDrop={handleDrop}
+        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={() => setIsDragging(false)}
+        className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+          isDragging ? 'border-orange-500 bg-orange-50' : 'border-stone-300 bg-white'
+        }`}
+      >
+        <FileText size={40} className="mx-auto text-stone-300 mb-3" />
+        <p className="text-stone-600 font-medium mb-1">Glissez votre carte ici</p>
+        <p className="text-sm text-stone-400 mb-4">Image (JPEG, PNG) ou PDF</p>
 
+        <label className="inline-flex items-center gap-2 bg-orange-700 text-white px-6 py-3 rounded-xl font-medium hover:bg-orange-800 transition-colors cursor-pointer">
+          <Upload size={18} />
+          Choisir un fichier
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf"
+            className="hidden"
+            onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])}
+          />
+        </label>
+      </div>
+
+      {/* Camera option */}
+      <button
+        onClick={() => cameraInputRef.current?.click()}
+        className="w-full bg-white text-stone-700 py-3 rounded-xl font-medium border border-stone-300 hover:border-stone-400 transition-colors flex items-center justify-center gap-2"
+      >
+        <Camera size={18} />
+        Photographier ma carte
+      </button>
       <input
         ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
         className="hidden"
-        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+        onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])}
       />
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-      />
-
-      {file && (
-        <button
-          onClick={handleExtract}
-          disabled={extractMutation.isPending}
-          className="w-full bg-orange-700 text-white py-3 rounded-xl font-medium hover:bg-orange-800 disabled:opacity-50 transition-colors"
-        >
-          {extractMutation.isPending ? 'Extraction en cours...' : 'Extraire les plats →'}
-        </button>
-      )}
 
       {extractMutation.isError && (
         <p className="text-red-600 text-sm text-center">
@@ -144,20 +157,26 @@ function StepPhoto({
 }
 
 // ----- Step 2: Review dishes -----
+type DishWithHomemade = ExtractedDish & { is_homemade: boolean };
+
 function StepDishes({
   dishes,
   onConfirm,
   isLoading,
 }: {
   dishes: ExtractedDish[];
-  onConfirm: (dishes: ExtractedDish[]) => void;
+  onConfirm: (dishes: DishWithHomemade[]) => void;
   isLoading: boolean;
 }) {
   const [editableDishes, setEditableDishes] = useState(
-    dishes.map((d) => ({ ...d, selected: true })),
+    dishes.map((d) => ({
+      ...d,
+      selected: true,
+      is_homemade: d.category ? !['boisson'].includes(d.category.toLowerCase()) : true,
+    })),
   );
 
-  function updateDish(index: number, updates: Partial<ExtractedDish & { selected: boolean }>) {
+  function updateDish(index: number, updates: Partial<ExtractedDish & { selected: boolean; is_homemade: boolean }>) {
     setEditableDishes((prev) =>
       prev.map((d, i) => (i === index ? { ...d, ...updates } : d)),
     );
@@ -166,14 +185,14 @@ function StepDishes({
   function addDish() {
     setEditableDishes((prev) => [
       ...prev,
-      { name: '', price: null, category: 'plat', selected: true },
+      { name: '', price: null, category: 'plat', selected: true, is_homemade: true },
     ]);
   }
 
   function handleConfirm() {
     const selected = editableDishes
       .filter((d) => d.selected && d.name.trim())
-      .map(({ name, price, category }) => ({ name: name.trim(), price, category }));
+      .map(({ name, price, category, is_homemade }) => ({ name: name.trim(), price, category, is_homemade }));
     onConfirm(selected);
   }
 
@@ -223,7 +242,13 @@ function StepDishes({
               />
               <select
                 value={dish.category ?? 'plat'}
-                onChange={(e) => updateDish(index, { category: e.target.value })}
+                onChange={(e) => {
+                  const cat = e.target.value;
+                  updateDish(index, {
+                    category: cat,
+                    is_homemade: !['boisson'].includes(cat.toLowerCase()),
+                  });
+                }}
                 className="flex-1 border border-stone-300 rounded-lg px-2 py-1.5 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
               >
                 {CATEGORIES.map((c) => (
@@ -231,6 +256,15 @@ function StepDishes({
                 ))}
               </select>
             </div>
+            <label className="flex items-center gap-1.5 ml-6 mt-1">
+              <input
+                type="checkbox"
+                checked={dish.is_homemade}
+                onChange={(e) => updateDish(index, { is_homemade: e.target.checked })}
+                className="w-3.5 h-3.5 accent-orange-700"
+              />
+              <span className="text-xs text-stone-500">Maison (avec sous-ingrédients)</span>
+            </label>
           </div>
         ))}
       </div>
@@ -446,6 +480,7 @@ function StepDone({
 export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [extractedDishes, setExtractedDishes] = useState<ExtractedDish[]>([]);
+  const [dishesHomemadeMap, setDishesHomemadeMap] = useState<Record<string, boolean>>({});
   const [dishesWithIngredients, setDishesWithIngredients] = useState<DishWithSuggestions[]>([]);
   const [result, setResult] = useState<{ recipes: number; ingredients: number } | null>(null);
 
@@ -457,10 +492,32 @@ export default function Onboarding() {
     setStep(1);
   }
 
-  function handleDishesConfirmed(dishes: ExtractedDish[]) {
-    suggestMutation.mutate(dishes, {
+  function handleDishesConfirmed(dishes: DishWithHomemade[]) {
+    // Store is_homemade mapping for later
+    const homemadeMap: Record<string, boolean> = {};
+    for (const d of dishes) {
+      homemadeMap[d.name] = d.is_homemade;
+    }
+    setDishesHomemadeMap(homemadeMap);
+
+    // Only suggest ingredients for homemade dishes
+    const homemadeDishes = dishes.filter((d) => d.is_homemade);
+    const boughtDishes = dishes.filter((d) => !d.is_homemade);
+
+    suggestMutation.mutate(homemadeDishes, {
       onSuccess: (data) => {
-        setDishesWithIngredients(data.dishes);
+        // Merge: homemade get suggested ingredients, bought get empty
+        const allDishes: DishWithSuggestions[] = [
+          ...data.dishes.map((d) => ({ ...d, is_homemade: true })),
+          ...boughtDishes.map((d) => ({
+            name: d.name,
+            price: d.price,
+            category: d.category,
+            is_homemade: false,
+            ingredients: [],
+          })),
+        ];
+        setDishesWithIngredients(allDishes);
         setStep(2);
       },
     });
@@ -468,11 +525,12 @@ export default function Onboarding() {
 
   function handleIngredientsConfirmed(dishes: DishWithSuggestions[]) {
     const confirmDishes = dishes
-      .filter((d) => d.ingredients.length > 0)
+      .filter((d) => d.is_homemade ? d.ingredients.length > 0 : true)
       .map((d) => ({
         name: d.name,
         selling_price: d.price ?? 10.0,
         category: d.category,
+        is_homemade: d.is_homemade ?? dishesHomemadeMap[d.name] ?? true,
         ingredients: d.ingredients.filter((i) => i.name.trim() && i.quantity > 0),
       }));
 
@@ -488,7 +546,7 @@ export default function Onboarding() {
     <div>
       <Stepper currentStep={step} />
 
-      {step === 0 && <StepPhoto onExtracted={handleExtracted} />}
+      {step === 0 && <StepMenu onExtracted={handleExtracted} />}
       {step === 1 && (
         <StepDishes
           dishes={extractedDishes}

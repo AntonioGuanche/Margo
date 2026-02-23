@@ -22,6 +22,7 @@ export interface DishWithSuggestions {
   name: string;
   price: number | null;
   category: string | null;
+  is_homemade?: boolean;
   ingredients: SuggestedIngredient[];
 }
 
@@ -33,6 +34,7 @@ interface OnboardingConfirmDish {
   name: string;
   selling_price: number;
   category: string | null;
+  is_homemade: boolean;
   ingredients: SuggestedIngredient[];
 }
 

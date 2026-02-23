@@ -36,6 +36,7 @@ def _build_recipe_list_item(recipe: Recipe) -> RecipeListItem:
         target_margin=recipe.target_margin,
         food_cost=recipe.food_cost,
         food_cost_percent=recipe.food_cost_percent,
+        is_homemade=recipe.is_homemade,
         margin_status=get_margin_status(recipe.food_cost_percent, target),
         created_at=recipe.created_at,
     )
@@ -69,6 +70,7 @@ def _build_recipe_response(recipe: Recipe) -> RecipeResponse:
         target_margin=recipe.target_margin,
         food_cost=recipe.food_cost,
         food_cost_percent=recipe.food_cost_percent,
+        is_homemade=recipe.is_homemade,
         margin_status=get_margin_status(recipe.food_cost_percent, target),
         ingredients=ingredient_responses,
         created_at=recipe.created_at,
@@ -144,29 +146,47 @@ async def create_recipe(
     db: AsyncSession = Depends(get_db),
 ) -> RecipeResponse:
     """Create a recipe with ingredients, calculate food cost."""
-    # Verify all ingredients belong to this restaurant
-    ingredient_ids = [ri.ingredient_id for ri in data.ingredients]
-    result = await db.execute(
-        select(Ingredient).where(
-            Ingredient.id.in_(ingredient_ids),
-            Ingredient.restaurant_id == restaurant.id,
-        )
-    )
-    found_ingredients = {ing.id: ing for ing in result.scalars().all()}
-
-    missing = set(ingredient_ids) - set(found_ingredients.keys())
-    if missing:
+    # Homemade recipes must have at least one ingredient
+    if data.is_homemade and not data.ingredients:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ingrédients introuvables: {sorted(missing)}",
+            detail="Un plat maison doit avoir au moins un ingrédient.",
         )
 
+    # Verify all ingredients belong to this restaurant
+    found_ingredients: dict[int, Ingredient] = {}
+    if data.ingredients:
+        ingredient_ids = [ri.ingredient_id for ri in data.ingredients]
+        result = await db.execute(
+            select(Ingredient).where(
+                Ingredient.id.in_(ingredient_ids),
+                Ingredient.restaurant_id == restaurant.id,
+            )
+        )
+        found_ingredients = {ing.id: ing for ing in result.scalars().all()}
+
+        missing = set(ingredient_ids) - set(found_ingredients.keys())
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Ingrédients introuvables: {sorted(missing)}",
+            )
+
     # Calculate food cost
-    ingredients_with_prices = [
-        (ri.quantity, found_ingredients[ri.ingredient_id].current_price)
-        for ri in data.ingredients
-    ]
-    food_cost, food_cost_percent = calculate_food_cost(ingredients_with_prices, data.selling_price)
+    food_cost: float | None = None
+    food_cost_percent: float | None = None
+    if data.is_homemade:
+        ingredients_with_prices = [
+            (ri.quantity, found_ingredients[ri.ingredient_id].current_price)
+            for ri in data.ingredients
+        ]
+        food_cost, food_cost_percent = calculate_food_cost(ingredients_with_prices, data.selling_price)
+    elif data.ingredients:
+        # Bought product: food_cost = first ingredient's price
+        price = found_ingredients[data.ingredients[0].ingredient_id].current_price
+        if price is not None:
+            food_cost = round(price, 4)
+            food_cost_percent = round((price / data.selling_price) * 100, 2) if data.selling_price > 0 else None
 
     # Create recipe
     recipe = Recipe(
@@ -175,6 +195,7 @@ async def create_recipe(
         selling_price=data.selling_price,
         category=data.category,
         target_margin=data.target_margin,
+        is_homemade=data.is_homemade,
         food_cost=food_cost,
         food_cost_percent=food_cost_percent,
     )

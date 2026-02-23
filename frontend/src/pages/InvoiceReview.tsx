@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, FileCheck, Check, Plus, Loader2 } from 'lucide-react';
-import { useInvoice, useConfirmInvoice } from '../hooks/useInvoices';
+import { ArrowLeft, FileCheck, Check, Plus, Loader2, Pencil } from 'lucide-react';
+import { useInvoice, useConfirmInvoice, usePatchInvoice } from '../hooks/useInvoices';
 import { useIngredients } from '../hooks/useIngredients';
 import type { InvoiceLineResponse } from '../hooks/useInvoices';
 
@@ -159,10 +159,13 @@ export default function InvoiceReview() {
   const { data: invoice, isLoading } = useInvoice(id);
   const { data: ingredientsData } = useIngredients();
   const confirm = useConfirmInvoice(id ?? '0');
+  const patchInvoice = usePatchInvoice(id ?? '0');
   const [showResult, setShowResult] = useState(false);
 
   const [lines, setLines] = useState<LineState[]>([]);
   const [initialized, setInitialized] = useState(false);
+  const [editSupplier, setEditSupplier] = useState('');
+  const [editDate, setEditDate] = useState('');
 
   // Initialize line state from fetched data
   if (invoice && !initialized) {
@@ -180,8 +183,23 @@ export default function InvoiceReview() {
         suggestions: l.suggestions,
       })),
     );
+    setEditSupplier(invoice.supplier_name ?? '');
+    setEditDate(invoice.invoice_date ?? '');
     setInitialized(true);
   }
+
+  const handlePatchField = (field: 'supplier_name' | 'invoice_date', value: string) => {
+    if (!value.trim()) return;
+    const current = field === 'supplier_name' ? invoice?.supplier_name : invoice?.invoice_date;
+    if (value === (current ?? '')) return; // no change
+    patchInvoice.mutate(
+      { [field]: value },
+      {
+        onSuccess: () => toast.success(field === 'supplier_name' ? 'Fournisseur mis à jour' : 'Date mise à jour'),
+        onError: (err) => toast.error(err.message),
+      },
+    );
+  };
 
   const allIngredients: IngredientItem[] = (ingredientsData?.items ?? []).map(
     (i: { id: number; name: string }) => ({ id: i.id, name: i.name }),
@@ -282,21 +300,36 @@ export default function InvoiceReview() {
         Vérifier la facture
       </h2>
 
-      {/* Invoice metadata */}
+      {/* Invoice metadata — editable supplier & date */}
       <div className="bg-white rounded-xl border border-stone-200 p-4 mb-4">
         <div className="grid grid-cols-2 gap-2 text-sm">
-          {invoice.supplier_name && (
-            <div>
-              <span className="text-stone-500">Fournisseur</span>
-              <p className="font-medium text-stone-900">{invoice.supplier_name}</p>
-            </div>
-          )}
-          {invoice.invoice_date && (
-            <div>
-              <span className="text-stone-500">Date</span>
-              <p className="font-medium text-stone-900">{invoice.invoice_date}</p>
-            </div>
-          )}
+          <div>
+            <span className="text-stone-500 flex items-center gap-1">
+              Fournisseur <Pencil size={12} className="text-stone-400" />
+            </span>
+            <input
+              type="text"
+              value={editSupplier}
+              onChange={(e) => setEditSupplier(e.target.value)}
+              onBlur={() => handlePatchField('supplier_name', editSupplier)}
+              placeholder="Nom du fournisseur"
+              className="w-full font-medium text-stone-900 bg-transparent border-b border-transparent hover:border-stone-300 focus:border-orange-500 focus:outline-none py-0.5 transition-colors"
+            />
+          </div>
+          <div>
+            <span className="text-stone-500 flex items-center gap-1">
+              Date <Pencil size={12} className="text-stone-400" />
+            </span>
+            <input
+              type="date"
+              value={editDate}
+              onChange={(e) => {
+                setEditDate(e.target.value);
+                handlePatchField('invoice_date', e.target.value);
+              }}
+              className="w-full font-medium text-stone-900 bg-transparent border-b border-transparent hover:border-stone-300 focus:border-orange-500 focus:outline-none py-0.5 transition-colors"
+            />
+          </div>
           {invoice.total_amount != null && (
             <div>
               <span className="text-stone-500">Montant total</span>

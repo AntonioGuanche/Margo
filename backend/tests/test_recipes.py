@@ -71,14 +71,26 @@ async def test_create_recipe(client: AsyncClient, auth_headers: dict, ingredient
 
 
 async def test_create_recipe_no_ingredients(client: AsyncClient, auth_headers: dict):
-    """POST with empty ingredients → 422."""
+    """POST homemade recipe with empty ingredients → 400."""
     payload = {
         "name": "Test",
         "selling_price": 10.0,
+        "is_homemade": True,
         "ingredients": [],
     }
     response = await client.post("/api/recipes", json=payload, headers=auth_headers)
-    assert response.status_code == 422
+    assert response.status_code == 400
+
+    # Bought product with no ingredients → allowed (201)
+    payload_bought = {
+        "name": "Test Bought",
+        "selling_price": 5.0,
+        "is_homemade": False,
+        "ingredients": [],
+    }
+    response = await client.post("/api/recipes", json=payload_bought, headers=auth_headers)
+    assert response.status_code == 201
+    assert response.json()["is_homemade"] is False
 
 
 async def test_get_recipe_with_costs(client: AsyncClient, auth_headers: dict, ingredients: list[Ingredient]):

@@ -21,6 +21,7 @@ class Recipe(Base):
     target_margin: Mapped[float | None] = mapped_column(nullable=True)
     food_cost: Mapped[float | None] = mapped_column(nullable=True)
     food_cost_percent: Mapped[float | None] = mapped_column(nullable=True)
+    is_homemade: Mapped[bool] = mapped_column(default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime | None] = mapped_column(
         onupdate=func.now(), server_default=func.now()

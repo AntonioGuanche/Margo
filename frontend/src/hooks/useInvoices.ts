@@ -155,6 +155,22 @@ export function useConfirmInvoice(invoiceId: number | string) {
   });
 }
 
+export function usePatchInvoice(invoiceId: number | string) {
+  const queryClient = useQueryClient();
+
+  return useMutation<InvoiceDetailResponse, Error, { supplier_name?: string; invoice_date?: string }>({
+    mutationFn: (body) =>
+      apiClient<InvoiceDetailResponse>(`/api/invoices/${invoiceId}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices', String(invoiceId)] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+  });
+}
+
 export function useDeleteInvoice() {
   const queryClient = useQueryClient();
 

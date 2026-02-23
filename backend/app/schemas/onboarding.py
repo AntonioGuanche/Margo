@@ -45,6 +45,7 @@ class OnboardingConfirmDish(BaseModel):
     name: str
     selling_price: float = Field(gt=0)
     category: str | None = None
+    is_homemade: bool = True
     ingredients: list[SuggestedIngredient]
 
 

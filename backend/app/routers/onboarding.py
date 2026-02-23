@@ -43,10 +43,13 @@ async def extract_menu(
     check_upload_rate_limit(restaurant.id)
     check_ai_rate_limit(restaurant.id)
 
-    if not file.content_type or not file.content_type.startswith("image/"):
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+    if not file.content_type or (
+        not file.content_type.startswith("image/") and file.content_type not in allowed_types
+    ):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Le fichier doit être une image (JPEG, PNG, WebP).",
+            detail="Le fichier doit être une image (JPEG, PNG, WebP) ou un PDF.",
         )
 
     # Validate file size
@@ -176,6 +179,7 @@ async def confirm_onboarding(
             name=dish.name,
             selling_price=dish.selling_price,
             category=dish.category,
+            is_homemade=dish.is_homemade,
             food_cost=food_cost,
             food_cost_percent=food_cost_percent,
         )

@@ -24,6 +24,7 @@ from app.schemas.invoice import (
     InvoiceLineResponse,
     InvoiceListItem,
     InvoiceListResponse,
+    InvoicePatchRequest,
     InvoiceUploadResponse,
 )
 from app.services.alerts import check_and_create_alerts
@@ -392,6 +393,73 @@ async def confirm_invoice(
         ingredients_created=ingredients_created,
         aliases_saved=aliases_saved,
         recipes_recalculated=recipes_recalculated,
+    )
+
+
+@router.patch("/{invoice_id}", response_model=InvoiceDetailResponse)
+async def patch_invoice(
+    invoice_id: int,
+    body: InvoicePatchRequest,
+    db: AsyncSession = Depends(get_db),
+    restaurant: Restaurant = Depends(get_current_restaurant),
+) -> InvoiceDetailResponse:
+    """Update supplier name and/or date on a pending invoice."""
+    result = await db.execute(
+        select(Invoice).where(
+            Invoice.id == invoice_id,
+            Invoice.restaurant_id == restaurant.id,
+        )
+    )
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Facture introuvable.",
+        )
+
+    if invoice.status == "confirmed":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Impossible de modifier une facture confirmée.",
+        )
+
+    if body.supplier_name is not None:
+        invoice.supplier_name = body.supplier_name
+    if body.invoice_date is not None:
+        invoice.invoice_date = dt.date.fromisoformat(body.invoice_date)
+
+    await db.flush()
+    await db.refresh(invoice)
+
+    # Build response
+    lines = []
+    if invoice.extracted_lines:
+        for ld in invoice.extracted_lines:
+            lines.append(InvoiceLineResponse(
+                description=ld["description"],
+                quantity=ld.get("quantity"),
+                unit=ld.get("unit"),
+                unit_price=ld.get("unit_price"),
+                total_price=ld.get("total_price"),
+                matched_ingredient_id=ld.get("matched_ingredient_id"),
+                matched_ingredient_name=ld.get("matched_ingredient_name"),
+                match_confidence=ld.get("match_confidence", "none"),
+                suggestions=[
+                    IngredientSuggestion(**s) for s in ld.get("suggestions", [])
+                ],
+            ))
+
+    return InvoiceDetailResponse(
+        id=invoice.id,
+        supplier_name=invoice.supplier_name,
+        invoice_date=str(invoice.invoice_date) if invoice.invoice_date else None,
+        source=invoice.source,
+        format=invoice.format,
+        status=invoice.status,
+        total_amount=invoice.total_amount,
+        lines=lines,
+        raw_text=None,
+        created_at=invoice.created_at,
     )
 
 
