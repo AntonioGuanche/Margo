@@ -93,9 +93,9 @@ def _try_extract_lines_from_tables(pdf: pdfplumber.PDF) -> list[InvoiceLine]:
             total_idx = None
 
             for i, h in enumerate(header_lower):
-                if any(kw in h for kw in ["description", "désignation", "article", "produit", "libellé", "nom"]):
+                if any(kw in h for kw in ["description", "designation", "désignation", "article", "produit", "libellé", "libelle", "nom"]):
                     desc_idx = i
-                elif any(kw in h for kw in ["quantité", "qté", "qty", "nombre"]):
+                elif any(kw in h for kw in ["quantité", "quantite", "qté", "qte", "qtes", "qty", "nombre"]):
                     qty_idx = i
                 elif any(kw in h for kw in ["prix unit", "p.u.", "pu", "unitaire"]):
                     unit_price_idx = i
