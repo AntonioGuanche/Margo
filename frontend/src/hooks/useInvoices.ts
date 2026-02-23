@@ -71,6 +71,9 @@ interface InvoiceConfirmLine {
   create_ingredient_name: string | null;
   unit_price: number | null;
   unit: string | null;
+  add_to_recipe_id?: number;
+  recipe_quantity?: number;
+  recipe_unit?: string;
 }
 
 interface InvoiceConfirmResponse {

@@ -48,6 +48,10 @@ class InvoiceConfirmLine(BaseModel):
     create_ingredient_name: str | None = None  # if new, create with this name
     unit_price: float | None = None
     unit: str | None = None
+    # Optional: associate this ingredient with an existing recipe
+    add_to_recipe_id: int | None = None
+    recipe_quantity: float | None = None
+    recipe_unit: str | None = None
 
 
 class InvoiceConfirmRequest(BaseModel):

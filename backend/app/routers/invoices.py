@@ -14,6 +14,7 @@ from app.models.ingredient import Ingredient
 from app.models.ingredient_alias import IngredientAlias
 from app.models.invoice import Invoice
 from app.models.price_history import IngredientPriceHistory
+from app.models.recipe import Recipe, RecipeIngredient
 from app.models.restaurant import Restaurant
 from app.dependencies import get_current_restaurant
 from app.schemas.invoice import (
@@ -362,6 +363,32 @@ async def confirm_invoice(
                 if line.description.lower() != ingredient.name.lower():
                     await save_alias(db, restaurant.id, line.description, ingredient_id)
                     aliases_saved += 1
+
+        # Associate ingredient with a recipe if requested
+        if line.add_to_recipe_id and ingredient_id and line.recipe_quantity:
+            recipe_result = await db.execute(
+                select(Recipe).where(
+                    Recipe.id == line.add_to_recipe_id,
+                    Recipe.restaurant_id == restaurant.id,
+                )
+            )
+            recipe = recipe_result.scalar_one_or_none()
+            if recipe:
+                existing_ri = await db.execute(
+                    select(RecipeIngredient).where(
+                        RecipeIngredient.recipe_id == recipe.id,
+                        RecipeIngredient.ingredient_id == ingredient_id,
+                    )
+                )
+                if not existing_ri.scalar_one_or_none():
+                    ri = RecipeIngredient(
+                        recipe_id=recipe.id,
+                        ingredient_id=ingredient_id,
+                        quantity=line.recipe_quantity,
+                        unit=line.recipe_unit or "g",
+                    )
+                    db.add(ri)
+                    affected_ingredient_ids.add(ingredient_id)
 
     # Cascade recalculate all affected recipes
     recipes_recalculated = 0
