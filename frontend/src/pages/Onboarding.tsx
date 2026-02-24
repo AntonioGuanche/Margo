@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Camera, Upload, Plus, Trash2, Check, ChevronDown, ChevronUp, FileText, Loader2 } from 'lucide-react';
+import { Camera, Upload, Plus, Trash2, Check, ChevronDown, ChevronUp, FileText, Loader2, CopyPlus } from 'lucide-react';
 import {
   useExtractMenu,
   useSuggestIngredients,
@@ -189,6 +189,25 @@ function StepDishes({
     ]);
   }
 
+  function duplicateDish(index: number) {
+    setEditableDishes((prev) => {
+      const source = prev[index];
+      const copy = {
+        ...source,
+        name: '',
+        selected: true,
+      };
+      const next = [...prev];
+      next.splice(index + 1, 0, copy);
+      return next;
+    });
+    // Focus the name input of the new line
+    setTimeout(() => {
+      const inputs = document.querySelectorAll<HTMLInputElement>('[data-dish-name]');
+      inputs[index + 1]?.focus();
+    }, 50);
+  }
+
   function handleConfirm() {
     const selected = editableDishes
       .filter((d) => d.selected && d.name.trim())
@@ -222,11 +241,19 @@ function StepDishes({
               />
               <input
                 type="text"
+                data-dish-name
                 value={dish.name}
                 onChange={(e) => updateDish(index, { name: e.target.value })}
                 className="flex-1 border border-stone-300 rounded-lg px-2 py-1.5 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
                 placeholder="Nom du plat"
               />
+              <button
+                onClick={() => duplicateDish(index)}
+                className="p-1 text-stone-400 hover:text-orange-700 transition-colors"
+                title="Dupliquer ce plat"
+              >
+                <CopyPlus size={16} />
+              </button>
             </div>
             <div className="flex gap-2 ml-6">
               <input
