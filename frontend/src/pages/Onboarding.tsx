@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Camera, Upload, Plus, Trash2, Check, ChevronDown, ChevronUp, FileText, Loader2 } from 'lucide-react';
 import {
   useExtractMenu,
@@ -478,6 +478,9 @@ function StepDone({
 
 // ----- Main Onboarding page -----
 export default function Onboarding() {
+  const location = useLocation();
+  const initialFile = (location.state as { file?: File } | null)?.file;
+
   const [step, setStep] = useState(0);
   const [extractedDishes, setExtractedDishes] = useState<ExtractedDish[]>([]);
   const [dishesHomemadeMap, setDishesHomemadeMap] = useState<Record<string, boolean>>({});
@@ -486,6 +489,19 @@ export default function Onboarding() {
 
   const suggestMutation = useSuggestIngredients();
   const confirmMutation = useConfirmOnboarding();
+  const autoExtractMutation = useExtractMenu();
+
+  // Auto-extract if file passed from Ma Carte
+  useEffect(() => {
+    if (initialFile && step === 0) {
+      autoExtractMutation.mutate(initialFile, {
+        onSuccess: (data) => {
+          setExtractedDishes(data.dishes);
+          setStep(1);
+        },
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleExtracted(dishes: ExtractedDish[]) {
     setExtractedDishes(dishes);
@@ -546,7 +562,15 @@ export default function Onboarding() {
     <div>
       <Stepper currentStep={step} />
 
-      {step === 0 && <StepMenu onExtracted={handleExtracted} />}
+      {step === 0 && (autoExtractMutation.isPending ? (
+        <div className="space-y-4 text-center py-8">
+          <Loader2 size={48} className="text-orange-700 animate-spin mx-auto" />
+          <h3 className="text-lg font-semibold text-stone-900">Extraction en cours...</h3>
+          <p className="text-sm text-stone-500">L'IA analyse votre carte et extrait les plats</p>
+        </div>
+      ) : (
+        <StepMenu onExtracted={handleExtracted} />
+      ))}
       {step === 1 && (
         <StepDishes
           dishes={extractedDishes}

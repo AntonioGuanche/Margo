@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, BookOpen, Camera, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Search, BookOpen, Camera, ChevronDown, ChevronRight, Pencil, FileText } from 'lucide-react';
 import { useRecipes } from '../hooks/useRecipes';
 import { usePlanInfo } from '../hooks/useBilling';
 import { SkeletonList } from '../components/Skeleton';
@@ -72,18 +72,29 @@ export default function Recipes() {
   const { data: planInfo } = usePlanInfo();
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const atLimit =
     planInfo?.max_recipes !== null &&
     planInfo?.max_recipes !== undefined &&
     planInfo.current_recipes >= planInfo.max_recipes;
 
-  function handleAdd() {
-    if (atLimit) {
-      setShowUpgrade(true);
-      return;
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setShowAddMenu(false);
+      }
     }
-    navigate('/recipes/new');
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function handleMenuFile(file: File) {
+    navigate('/onboarding', { state: { file } });
   }
 
   const recipes = data?.items ?? [];
@@ -108,18 +119,78 @@ export default function Recipes() {
             </span>
           )}
         </div>
-        <button
-          onClick={handleAdd}
-          disabled={atLimit}
-          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
-            atLimit
-              ? 'bg-stone-200 text-stone-400 cursor-not-allowed'
-              : 'bg-orange-700 text-white hover:bg-orange-800'
-          }`}
-        >
-          <Plus size={16} />
-          Ajouter
-        </button>
+        <div className="relative" ref={addMenuRef}>
+          <button
+            onClick={() => {
+              if (atLimit) {
+                setShowUpgrade(true);
+                return;
+              }
+              setShowAddMenu(!showAddMenu);
+            }}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+              atLimit
+                ? 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                : 'bg-orange-700 text-white hover:bg-orange-800'
+            }`}
+          >
+            <Plus size={16} />
+            Ajouter
+            {!atLimit && <ChevronDown size={14} />}
+          </button>
+
+          {showAddMenu && (
+            <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-xl border border-stone-200 shadow-lg z-50 overflow-hidden">
+              <button
+                onClick={() => { setShowAddMenu(false); navigate('/recipes/new'); }}
+                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-stone-50 text-left"
+              >
+                <Pencil size={18} className="text-stone-500" />
+                <div>
+                  <p className="text-sm font-medium text-stone-900">Ajouter manuellement</p>
+                  <p className="text-xs text-stone-500">Créer un plat avec prix et ingrédients</p>
+                </div>
+              </button>
+              <button
+                onClick={() => { setShowAddMenu(false); cameraRef.current?.click(); }}
+                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-stone-50 text-left border-t border-stone-100"
+              >
+                <Camera size={18} className="text-stone-500" />
+                <div>
+                  <p className="text-sm font-medium text-stone-900">Photographier ma carte</p>
+                  <p className="text-xs text-stone-500">L'IA extraira les plats et prix</p>
+                </div>
+              </button>
+              <button
+                onClick={() => { setShowAddMenu(false); fileRef.current?.click(); }}
+                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-stone-50 text-left border-t border-stone-100"
+              >
+                <FileText size={18} className="text-stone-500" />
+                <div>
+                  <p className="text-sm font-medium text-stone-900">Importer un fichier</p>
+                  <p className="text-xs text-stone-500">PDF ou image de votre carte</p>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Hidden inputs for camera & file picker */}
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleMenuFile(e.target.files[0])}
+        />
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".jpg,.jpeg,.png,.webp,.pdf"
+          className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleMenuFile(e.target.files[0])}
+        />
       </div>
 
       {/* Search */}

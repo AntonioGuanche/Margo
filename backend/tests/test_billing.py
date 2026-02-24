@@ -56,23 +56,24 @@ async def test_get_plan_free(client: AsyncClient, auth_headers: dict, restaurant
     assert resp.status_code == 200
     data = resp.json()
     assert data["current_plan"] == "free"
-    assert data["max_recipes"] == 5
+    assert data["max_recipes"] == 200  # temporarily raised for field testing
     assert data["max_invoices_per_month"] == 3
     assert data["current_recipes"] == 0
     assert data["current_invoices_this_month"] == 0
     assert data["can_manage_billing"] is False
 
 
+@patch("app.services.billing.PLAN_LIMITS", {"free": {"max_recipes": 5, "max_invoices_per_month": 3}, "pro": {"max_recipes": None, "max_invoices_per_month": None}, "multi": {"max_recipes": None, "max_invoices_per_month": None}})
 async def test_recipe_limit_free(
     client: AsyncClient, auth_headers: dict, db_session: AsyncSession, restaurant: Restaurant
 ):
-    """Create 5 recipes OK, 6th → 403."""
+    """Create 5 recipes OK, 6th → 403 (patched limit=5 for test)."""
     # Create an ingredient first
     ing = Ingredient(restaurant_id=restaurant.id, name="Test", unit="kg")
     db_session.add(ing)
     await db_session.flush()
 
-    # Create 5 recipes (max for free)
+    # Create 5 recipes (max for free with patched limit)
     for i in range(5):
         await _create_recipe(db_session, restaurant.id, f"Recette {i+1}")
     await db_session.flush()
