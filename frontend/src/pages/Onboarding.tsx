@@ -8,8 +8,34 @@ import {
 } from '../hooks/useOnboarding';
 import type { ExtractedDish, DishWithSuggestions } from '../hooks/useOnboarding';
 
-const CATEGORIES = ['entrée', 'plat', 'dessert', 'boisson', 'autre'];
+const CATEGORIES = ['entrée', 'plat', 'dessert', 'cocktail', 'boisson', 'autre'];
 const UNITS = ['g', 'kg', 'cl', 'l', 'piece'];
+
+const COCKTAIL_NAMES = new Set([
+  'mojito', 'cuba libre', 'sex on the beach', 'cosmopolitan',
+  'margarita', 'daiquiri', 'caipirinha', 'pina colada', 'piña colada',
+  'tequila sunrise', 'long island', 'gin tonic', 'gin & tonic',
+  'vodka tonic', 'whisky coca', 'rhum coca', 'moscow mule',
+  'spritz', 'aperol spritz', 'hugo', 'negroni',
+  'old fashioned', 'manhattan', 'bloody mary', 'mimosa', 'bellini',
+  'kir', 'kir royal', 'kir royale', 'irish coffee', 'espresso martini',
+  'sangria', 'punch', 'planteur', 'ti punch',
+  'tom collins', 'whisky sour', 'mai tai', 'blue lagoon',
+  'paloma', 'sidecar', 'french 75', 'cuba',
+]);
+
+const COCKTAIL_KEYWORDS = ['cocktail', 'mocktail', 'virgin', 'spritz', 'sour', 'mule', 'fizz', 'collins', 'punch', 'sangria'];
+
+function isCocktail(name: string): boolean {
+  const lower = name.toLowerCase().trim();
+  for (const c of COCKTAIL_NAMES) {
+    if (lower.includes(c)) return true;
+  }
+  for (const kw of COCKTAIL_KEYWORDS) {
+    if (lower.includes(kw)) return true;
+  }
+  return false;
+}
 
 function Stepper({ currentStep }: { currentStep: number }) {
   const steps = ['Menu', 'Plats', 'Ingrédients', 'Terminé'];
@@ -169,11 +195,23 @@ function StepDishes({
   isLoading: boolean;
 }) {
   const [editableDishes, setEditableDishes] = useState(
-    dishes.map((d) => ({
-      ...d,
-      selected: true,
-      is_homemade: d.category ? !['boisson'].includes(d.category.toLowerCase()) : true,
-    })),
+    dishes.map((d) => {
+      const cat = (d.category ?? '').toLowerCase();
+      // Cocktails and cocktail category → homemade (has sub-ingredients)
+      // Boissons (non-cocktail) → purchased
+      // Entrée, plat, dessert → homemade
+      // Autre → purchased by default
+      const isHomemade = cat === 'cocktail'
+        ? true
+        : cat === 'boisson'
+          ? isCocktail(d.name)
+          : ['entrée', 'plat', 'dessert'].includes(cat) || (!cat && true);
+      return {
+        ...d,
+        selected: true,
+        is_homemade: isHomemade,
+      };
+    }),
   );
 
   function updateDish(index: number, updates: Partial<ExtractedDish & { selected: boolean; is_homemade: boolean }>) {
@@ -270,10 +308,15 @@ function StepDishes({
               <select
                 value={dish.category ?? 'plat'}
                 onChange={(e) => {
-                  const cat = e.target.value;
+                  const cat = e.target.value.toLowerCase();
+                  const homemade = cat === 'cocktail'
+                    ? true
+                    : cat === 'boisson'
+                      ? isCocktail(dish.name)
+                      : ['entrée', 'plat', 'dessert'].includes(cat);
                   updateDish(index, {
-                    category: cat,
-                    is_homemade: !['boisson'].includes(cat.toLowerCase()),
+                    category: e.target.value,
+                    is_homemade: homemade,
                   });
                 }}
                 className="flex-1 border border-stone-300 rounded-lg px-2 py-1.5 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"

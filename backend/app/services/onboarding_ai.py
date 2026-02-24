@@ -18,7 +18,13 @@ On te montre la photo d'une carte de restaurant.
 Extrais TOUS les plats avec leur prix.
 Réponds UNIQUEMENT en JSON valide, sans markdown, sans commentaire.
 Format : [{"name": "Nom du plat", "price": 19.50, "category": "plat"}]
-Les catégories possibles : "entrée", "plat", "dessert", "boisson", "autre"
+Les catégories possibles :
+- "entrée" pour les entrées
+- "plat" pour les plats principaux
+- "dessert" pour les desserts
+- "cocktail" pour les cocktails et boissons préparées (mojito, spritz, kir, gin tonic, etc.)
+- "boisson" pour les boissons en bouteille/canette/fût (bières, sodas, vins, spiritueux purs)
+- "autre" si aucune catégorie ne correspond
 Si tu ne vois pas le prix, mets null.
 Si la photo est illisible ou ce n'est pas une carte, retourne []."""
 

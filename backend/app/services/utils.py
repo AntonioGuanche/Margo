@@ -1,5 +1,51 @@
 """Utility functions for business logic."""
 
+COCKTAIL_NAMES = {
+    'mojito', 'cuba libre', 'sex on the beach', 'cosmopolitan', 'cosmo',
+    'margarita', 'daiquiri', 'caipirinha', 'caipiroska', 'pina colada',
+    'piña colada', 'tequila sunrise', 'long island', 'long island iced tea',
+    'gin tonic', 'gin & tonic', 'gin-tonic', 'vodka tonic', 'vodka & tonic',
+    'whisky coca', 'whisky-coca', 'jack cola', 'rhum coca', 'rhum-coca',
+    'cuba', 'moscow mule', 'dark n stormy', 'dark and stormy',
+    'spritz', 'aperol spritz', 'hugo', 'negroni', 'americano',
+    'old fashioned', 'manhattan', 'martini dry', 'dry martini',
+    'bloody mary', 'mimosa', 'bellini', 'kir', 'kir royal', 'kir royale',
+    'irish coffee', 'espresso martini', 'b52', 'b-52',
+    'ti punch', 'ti-punch', 'planteur', 'punch',
+    'sangria', 'virgin mojito', 'virgin colada',
+    'tom collins', 'whisky sour', 'whiskey sour', 'sour',
+    'mai tai', 'blue lagoon', 'zombie', 'hurricane',
+    'paloma', 'sidecar', 'french 75', 'gimlet',
+    'pisco sour', 'amaretto sour', 'midori sour',
+    'penicillin', 'mule', 'fizz', 'collins',
+}
+
+COCKTAIL_KEYWORDS = [
+    'cocktail', 'mocktail', 'virgin', 'spritz', 'sour', 'mule',
+    'fizz', 'collins', 'punch', 'sangria',
+]
+
+
+def is_cocktail(name: str) -> bool:
+    """Detect if a dish name is a cocktail (= homemade, has sub-ingredients)."""
+    name_lower = name.lower().strip()
+
+    # Exact match
+    if name_lower in COCKTAIL_NAMES:
+        return True
+
+    # Check if name contains a cocktail name (e.g., "Kir, Kir Royal" contains "kir")
+    for cocktail in COCKTAIL_NAMES:
+        if cocktail in name_lower:
+            return True
+
+    # Keyword match
+    for kw in COCKTAIL_KEYWORDS:
+        if kw in name_lower:
+            return True
+
+    return False
+
 
 def guess_ingredient_category(name: str) -> str | None:
     """Guess ingredient category from its name (French / Belgian context)."""

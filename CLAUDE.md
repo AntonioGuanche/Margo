@@ -124,7 +124,8 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - Invoice matching: exact name → fuzzy (pg_trgm trigram) → suggest new ingredient
 - After user confirms a match, store it as IngredientAlias for future auto-matching
 - **Invoice portions:** unit_parser.py parses Belgian packaging patterns (24/3, CASIER 24, 6x25cl), calculates volume-based portions for beer/wine/spirit with interactive serving size
-- **Onboarding:** photo/PDF of menu → AI extracts dishes → AI suggests ingredients (homemade only) → purchased items auto-get ingredient = product name (qty 1, unit piece) → batch creation
+- **Onboarding:** photo/PDF of menu → AI extracts dishes (with cocktail category) → AI suggests ingredients (homemade only) → purchased items auto-get ingredient = product name (qty 1, unit piece) → batch creation
+- **Cocktail detection:** `is_cocktail()` in utils.py + `isCocktail()` in Onboarding.tsx detect cocktails by name/keywords → marked homemade (has sub-ingredients). Non-cocktail boissons → purchased.
 - **Plan limits:** free = 200 recipes (temporarily raised from 5), 3 invoices/month. Pro/Multi = unlimited.
 
 ## Important patterns
@@ -156,4 +157,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 19 — Auto-ingrédient for purchased products. See @PLAN.md for original roadmap.
+Sprint 20 — Cocktails = homemade by default. See @PLAN.md for original roadmap.
