@@ -29,6 +29,11 @@ interface LineState {
   unit_price: number | null;
   total_price: number | null;
   units_per_package: number | null;
+  volume_liters: number | null;
+  serving_type: string | null;
+  suggested_serving_cl: number | null;
+  suggested_portions: number | null;
+  price_per_portion: number | null;
   ingredient_id: number | null;
   create_ingredient_name: string | null;
   ignored: boolean;
@@ -193,6 +198,52 @@ function LineRow({
                 </span>
               </div>
             )}
+
+          {/* Portion calculation from volume (kegs, BIB, bottles) */}
+          {!line.is_manual &&
+            line.volume_liters != null &&
+            line.suggested_portions != null &&
+            line.suggested_portions > 0 && (
+              <div className="text-xs bg-blue-50 rounded-lg px-2 py-1.5 mt-1 space-y-1">
+                <div className="flex items-center gap-1 text-blue-700">
+                  <span>🍺</span>
+                  <span>
+                    {line.volume_liters}L ÷ {line.suggested_serving_cl}cl
+                    = <strong>{line.suggested_portions} portions</strong>
+                    {line.price_per_portion != null && (
+                      <> → <strong>{line.price_per_portion.toFixed(2)} €/portion</strong></>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-blue-600">
+                  <span className="text-[10px]">Taille service :</span>
+                  <select
+                    value={line.suggested_serving_cl ?? 25}
+                    onChange={(e) => {
+                      const newCl = parseFloat(e.target.value);
+                      const newPortions = Math.floor((line.volume_liters! * 100) / newCl);
+                      const newPrice = line.total_price && newPortions > 0
+                        ? line.total_price / newPortions
+                        : null;
+                      onChange({
+                        suggested_serving_cl: newCl,
+                        suggested_portions: newPortions,
+                        price_per_portion: newPrice,
+                      });
+                    }}
+                    className="text-xs border border-blue-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  >
+                    <option value="25">25cl (bière)</option>
+                    <option value="33">33cl (bière)</option>
+                    <option value="50">50cl (pinte)</option>
+                    <option value="12.5">12.5cl (vin)</option>
+                    <option value="15">15cl (vin)</option>
+                    <option value="4">4cl (alcool)</option>
+                    <option value="2">2cl (shot)</option>
+                  </select>
+                </div>
+              </div>
+            )}
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
@@ -263,15 +314,29 @@ function LineRow({
 
           {/* Create new ingredient input */}
           {showCreate && (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newName}
-                onChange={(e) => handleCreateName(e.target.value)}
-                placeholder="Nom du nouvel ingrédient"
-                className="flex-1 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-              />
-              <Plus size={18} className="text-emerald-600 self-center" />
+            <div>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => handleCreateName(e.target.value)}
+                  placeholder="Nom du nouvel ingrédient"
+                  className="flex-1 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                {newName.trim() ? (
+                  <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium whitespace-nowrap">
+                    <Check size={14} />
+                    Sera créé
+                  </span>
+                ) : (
+                  <span className="text-xs text-stone-400 whitespace-nowrap">Entrez un nom</span>
+                )}
+              </div>
+              {newName.trim() && (
+                <p className="text-xs text-stone-400 mt-0.5">
+                  L'ingrédient sera créé automatiquement à la confirmation de la facture.
+                </p>
+              )}
             </div>
           )}
 
@@ -468,6 +533,11 @@ export default function InvoiceReview() {
         unit_price: l.unit_price,
         total_price: l.total_price,
         units_per_package: l.units_per_package,
+        volume_liters: l.volume_liters,
+        serving_type: l.serving_type,
+        suggested_serving_cl: l.suggested_serving_cl,
+        suggested_portions: l.suggested_portions,
+        price_per_portion: l.price_per_portion,
         ingredient_id: l.matched_ingredient_id,
         create_ingredient_name: null,
         ignored: false,
@@ -524,6 +594,11 @@ export default function InvoiceReview() {
         unit_price: null,
         total_price: null,
         units_per_package: null,
+        volume_liters: null,
+        serving_type: null,
+        suggested_serving_cl: null,
+        suggested_portions: null,
+        price_per_portion: null,
         ingredient_id: null,
         create_ingredient_name: null,
         ignored: false,

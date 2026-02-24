@@ -22,6 +22,12 @@ class InvoiceLineResponse(BaseModel):
     unit_price: float | None = None
     total_price: float | None = None
     units_per_package: int | None = None
+    # Volume-based portion calculation
+    volume_liters: float | None = None
+    serving_type: str | None = None  # 'beer', 'wine', 'spirit'
+    suggested_serving_cl: float | None = None  # 25, 12.5, 4
+    suggested_portions: int | None = None
+    price_per_portion: float | None = None
     matched_ingredient_id: int | None = None
     matched_ingredient_name: str | None = None
     match_confidence: str = "none"

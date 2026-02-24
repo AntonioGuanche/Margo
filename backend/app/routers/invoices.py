@@ -32,7 +32,12 @@ from app.services.alerts import check_and_create_alerts
 from app.services.costing import recalculate_recipes_for_ingredient
 from app.services.invoice_router import parse_invoice_file
 from app.services.matching import match_invoice_lines, save_alias
-from app.services.unit_parser import parse_units_per_package
+from app.services.unit_parser import (
+    SERVING_SIZES,
+    guess_serving_type,
+    parse_units_per_package,
+    parse_volume_liters,
+)
 from app.services.utils import guess_ingredient_category
 from app.services.storage import save_upload
 
@@ -50,6 +55,32 @@ ALLOWED_MIME_TYPES = {
     "application/xml",
     "text/xml",
 }
+
+
+def _compute_portion_fields(
+    description: str,
+    total_price: float | None,
+    units_per_package: int | None,
+) -> dict:
+    """Compute volume-based portion fields for a line (only if no units_per_package)."""
+    if units_per_package:
+        return {}
+    volume = parse_volume_liters(description)
+    serving_type = guess_serving_type(description)
+    if volume and serving_type:
+        serving_cl = SERVING_SIZES[serving_type]
+        portions = int(volume * 100 / serving_cl)
+        price_per_portion = (
+            total_price / portions if portions > 0 and total_price else None
+        )
+        return {
+            "volume_liters": volume,
+            "serving_type": serving_type,
+            "suggested_serving_cl": serving_cl,
+            "suggested_portions": portions,
+            "price_per_portion": round(price_per_portion, 4) if price_per_portion else None,
+        }
+    return {}
 
 
 def _build_line_responses(match_results: list) -> list[dict]:
@@ -73,6 +104,33 @@ def _build_line_responses(match_results: list) -> list[dict]:
             "suggestions": mr.suggestions,
         })
     return lines
+
+
+def _line_dict_to_response(ld: dict) -> InvoiceLineResponse:
+    """Convert a JSONB line dict to InvoiceLineResponse, with portion computation."""
+    upp = ld.get("units_per_package")
+    if upp is None:
+        upp = parse_units_per_package(ld.get("description", ""))
+    portion = _compute_portion_fields(ld.get("description", ""), ld.get("total_price"), upp)
+    return InvoiceLineResponse(
+        description=ld["description"],
+        quantity=ld.get("quantity"),
+        unit=ld.get("unit"),
+        unit_price=ld.get("unit_price"),
+        total_price=ld.get("total_price"),
+        units_per_package=upp,
+        volume_liters=portion.get("volume_liters"),
+        serving_type=portion.get("serving_type"),
+        suggested_serving_cl=portion.get("suggested_serving_cl"),
+        suggested_portions=portion.get("suggested_portions"),
+        price_per_portion=portion.get("price_per_portion"),
+        matched_ingredient_id=ld.get("matched_ingredient_id"),
+        matched_ingredient_name=ld.get("matched_ingredient_name"),
+        match_confidence=ld.get("match_confidence", "none"),
+        suggestions=[
+            IngredientSuggestion(**s) for s in ld.get("suggestions", [])
+        ],
+    )
 
 
 @router.post("/upload", response_model=InvoiceUploadResponse)
@@ -152,23 +210,7 @@ async def upload_invoice(
     await db.refresh(invoice)
 
     # Build response
-    response_lines = [
-        InvoiceLineResponse(
-            description=ld["description"],
-            quantity=ld["quantity"],
-            unit=ld["unit"],
-            unit_price=ld["unit_price"],
-            total_price=ld["total_price"],
-            units_per_package=ld.get("units_per_package"),
-            matched_ingredient_id=ld["matched_ingredient_id"],
-            matched_ingredient_name=ld["matched_ingredient_name"],
-            match_confidence=ld["match_confidence"],
-            suggestions=[
-                IngredientSuggestion(**s) for s in ld["suggestions"]
-            ],
-        )
-        for ld in line_dicts
-    ]
+    response_lines = [_line_dict_to_response(ld) for ld in line_dicts]
 
     return InvoiceUploadResponse(
         invoice_id=invoice.id,
@@ -247,27 +289,7 @@ async def get_invoice(
         )
 
     # Rebuild line responses from JSONB
-    lines = []
-    if invoice.extracted_lines:
-        for ld in invoice.extracted_lines:
-            # Fallback: parse units_per_package from description if not stored
-            upp = ld.get("units_per_package")
-            if upp is None:
-                upp = parse_units_per_package(ld.get("description", ""))
-            lines.append(InvoiceLineResponse(
-                description=ld["description"],
-                quantity=ld.get("quantity"),
-                unit=ld.get("unit"),
-                unit_price=ld.get("unit_price"),
-                total_price=ld.get("total_price"),
-                units_per_package=upp,
-                matched_ingredient_id=ld.get("matched_ingredient_id"),
-                matched_ingredient_name=ld.get("matched_ingredient_name"),
-                match_confidence=ld.get("match_confidence", "none"),
-                suggestions=[
-                    IngredientSuggestion(**s) for s in ld.get("suggestions", [])
-                ],
-            ))
+    lines = [_line_dict_to_response(ld) for ld in (invoice.extracted_lines or [])]
 
     return InvoiceDetailResponse(
         id=invoice.id,
@@ -497,26 +519,7 @@ async def patch_invoice(
     await db.refresh(invoice)
 
     # Build response
-    lines = []
-    if invoice.extracted_lines:
-        for ld in invoice.extracted_lines:
-            upp = ld.get("units_per_package")
-            if upp is None:
-                upp = parse_units_per_package(ld.get("description", ""))
-            lines.append(InvoiceLineResponse(
-                description=ld["description"],
-                quantity=ld.get("quantity"),
-                unit=ld.get("unit"),
-                unit_price=ld.get("unit_price"),
-                total_price=ld.get("total_price"),
-                units_per_package=upp,
-                matched_ingredient_id=ld.get("matched_ingredient_id"),
-                matched_ingredient_name=ld.get("matched_ingredient_name"),
-                match_confidence=ld.get("match_confidence", "none"),
-                suggestions=[
-                    IngredientSuggestion(**s) for s in ld.get("suggestions", [])
-                ],
-            ))
+    lines = [_line_dict_to_response(ld) for ld in (invoice.extracted_lines or [])]
 
     return InvoiceDetailResponse(
         id=invoice.id,

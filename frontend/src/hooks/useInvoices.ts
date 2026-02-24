@@ -16,6 +16,11 @@ export interface InvoiceLineResponse {
   unit_price: number | null;
   total_price: number | null;
   units_per_package: number | null;
+  volume_liters: number | null;
+  serving_type: string | null;
+  suggested_serving_cl: number | null;
+  suggested_portions: number | null;
+  price_per_portion: number | null;
   matched_ingredient_id: number | null;
   matched_ingredient_name: string | null;
   match_confidence: string;

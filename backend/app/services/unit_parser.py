@@ -44,3 +44,73 @@ def parse_units_per_package(description: str) -> int | None:
                 return value
 
     return None
+
+
+# --- Volume-based portion calculation ---
+
+def parse_volume_liters(description: str) -> float | None:
+    """Extract total volume in liters from description.
+
+    Examples:
+        "STELLA ARTOIS 20 L IFK" → 20.0
+        "BAG IN BOX 5 L" → 5.0
+        "1725 B&G PAYS D'OC 0.75L MERLOT" → 0.75
+        "CAVA BRUT ESPATULA 0.75" → 0.75
+        "LEFFE BLONDE 6% 24/3" → None (handled by units_per_package)
+    """
+    desc_lower = description.lower()
+
+    # Pattern: "20 L", "20L", "5 L", "0.75L", "0.75 L"
+    match = re.search(r'(\d+(?:[.,]\d+)?)\s*l(?:\s|$|[^a-z])', desc_lower)
+    if match:
+        value = float(match.group(1).replace(',', '.'))
+        if 0.1 <= value <= 100:  # sanity check
+            return value
+
+    return None
+
+
+def guess_serving_type(description: str) -> str | None:
+    """Guess the serving type based on description keywords.
+
+    Returns: 'beer', 'wine', 'spirit', or None
+    """
+    desc_lower = description.lower()
+
+    beer_keywords = [
+        'bière', 'biere', 'stella', 'leffe', 'chimay', 'orval',
+        'westmalle', 'duvel', 'chouffe', 'rochefort', 'karmeliet',
+        'hoegaarden', 'jupiler', 'maes', 'cristal', 'ipa', 'lager',
+        'blonde', 'brune', 'triple', 'stout', 'pils', 'ifk', 'fût', 'fut',
+        'godefroy', 'semois',
+    ]
+
+    wine_keywords = [
+        'vin', 'wine', 'merlot', 'sauvignon', 'chardonnay', 'pinot',
+        'cabernet', 'rosé', 'rose', 'cava', 'prosecco', 'champagne',
+        'crémant', 'cremant', "pays d'oc", 'bordeaux', 'bourgogne',
+        'côtes', 'cotes', 'bag in box', 'bib',
+    ]
+
+    spirit_keywords = [
+        'whisky', 'whiskey', 'vodka', 'gin', 'rhum', 'rum',
+        'cognac', 'porto', 'amaretto', 'pastis', 'ricard',
+        'tequila', 'calvados', 'grappa', 'limoncello',
+        'get 27', 'baileys', 'cointreau', 'grand marnier',
+    ]
+
+    if any(kw in desc_lower for kw in beer_keywords):
+        return 'beer'
+    if any(kw in desc_lower for kw in wine_keywords):
+        return 'wine'
+    if any(kw in desc_lower for kw in spirit_keywords):
+        return 'spirit'
+    return None
+
+
+# Default serving sizes in cl
+SERVING_SIZES: dict[str, float] = {
+    'beer': 25,     # 25cl
+    'wine': 12.5,   # 12.5cl (un verre)
+    'spirit': 4,    # 4cl
+}
