@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Camera, Upload, Plus, Trash2, Check, ChevronDown, ChevronUp, FileText, Loader2, CopyPlus } from 'lucide-react';
+import { Camera, Upload, Plus, Trash2, Check, ChevronDown, ChevronUp, FileText, Loader2, CopyPlus, ShoppingCart } from 'lucide-react';
 import {
   useExtractMenu,
   useSuggestIngredients,
@@ -389,9 +389,13 @@ function StepIngredients({
             >
               <div>
                 <span className="font-medium text-stone-900">{dish.name}</span>
-                <span className="text-sm text-stone-500 ml-2">
-                  {dish.ingredients.length} ingrédient{dish.ingredients.length > 1 ? 's' : ''}
-                </span>
+                {dish.is_homemade ? (
+                  <span className="text-sm text-stone-500 ml-2">
+                    {dish.ingredients.length} ingrédient{dish.ingredients.length > 1 ? 's' : ''}
+                  </span>
+                ) : (
+                  <span className="text-sm text-emerald-600 ml-2">Acheté</span>
+                )}
               </div>
               {openIndex === dishIdx ? (
                 <ChevronUp size={18} className="text-stone-400" />
@@ -402,57 +406,66 @@ function StepIngredients({
 
             {/* Accordion body */}
             {openIndex === dishIdx && (
-              <div className="px-4 pb-3 space-y-2 border-t border-stone-100 pt-3">
-                {dish.ingredients.map((ing, ingIdx) => (
-                  <div key={ingIdx} className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={ing.name}
-                      onChange={(e) =>
-                        updateIngredient(dishIdx, ingIdx, { name: e.target.value })
-                      }
-                      className="flex-1 border border-stone-300 rounded-lg px-2 py-1.5 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
-                      placeholder="Ingrédient"
-                    />
-                    <input
-                      type="number"
-                      value={ing.quantity || ''}
-                      onChange={(e) =>
-                        updateIngredient(dishIdx, ingIdx, {
-                          quantity: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      className="w-20 border border-stone-300 rounded-lg px-2 py-1.5 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
-                      placeholder="Qté"
-                      inputMode="decimal"
-                      step="0.1"
-                    />
-                    <select
-                      value={ing.unit}
-                      onChange={(e) =>
-                        updateIngredient(dishIdx, ingIdx, { unit: e.target.value })
-                      }
-                      className="w-16 border border-stone-300 rounded-lg px-1 py-1.5 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
-                    >
-                      {UNITS.map((u) => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
+              <div className="px-4 pb-3 border-t border-stone-100 pt-3">
+                {!dish.is_homemade ? (
+                  <div className="flex items-center gap-2 text-sm text-stone-500">
+                    <ShoppingCart size={14} />
+                    <span>Produit acheté — l'ingrédient « {dish.name} » sera créé automatiquement</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {dish.ingredients.map((ing, ingIdx) => (
+                      <div key={ingIdx} className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={ing.name}
+                          onChange={(e) =>
+                            updateIngredient(dishIdx, ingIdx, { name: e.target.value })
+                          }
+                          className="flex-1 border border-stone-300 rounded-lg px-2 py-1.5 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                          placeholder="Ingrédient"
+                        />
+                        <input
+                          type="number"
+                          value={ing.quantity || ''}
+                          onChange={(e) =>
+                            updateIngredient(dishIdx, ingIdx, {
+                              quantity: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-20 border border-stone-300 rounded-lg px-2 py-1.5 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                          placeholder="Qté"
+                          inputMode="decimal"
+                          step="0.1"
+                        />
+                        <select
+                          value={ing.unit}
+                          onChange={(e) =>
+                            updateIngredient(dishIdx, ingIdx, { unit: e.target.value })
+                          }
+                          className="w-16 border border-stone-300 rounded-lg px-1 py-1.5 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                        >
+                          {UNITS.map((u) => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => removeIngredient(dishIdx, ingIdx)}
+                          className="p-1 text-stone-400 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
                     <button
-                      onClick={() => removeIngredient(dishIdx, ingIdx)}
-                      className="p-1 text-stone-400 hover:text-red-600 transition-colors"
+                      onClick={() => addIngredient(dishIdx)}
+                      className="flex items-center gap-1 text-xs text-orange-700 hover:text-orange-800 font-medium mt-1"
                     >
-                      <Trash2 size={14} />
+                      <Plus size={14} />
+                      Ajouter un ingrédient
                     </button>
                   </div>
-                ))}
-                <button
-                  onClick={() => addIngredient(dishIdx)}
-                  className="flex items-center gap-1 text-xs text-orange-700 hover:text-orange-800 font-medium mt-1"
-                >
-                  <Plus size={14} />
-                  Ajouter un ingrédient
-                </button>
+                )}
               </div>
             )}
           </div>
@@ -549,27 +562,36 @@ export default function Onboarding() {
     }
     setDishesHomemadeMap(homemadeMap);
 
-    // Only suggest ingredients for homemade dishes
+    // Separate homemade from purchased
     const homemadeDishes = dishes.filter((d) => d.is_homemade);
     const boughtDishes = dishes.filter((d) => !d.is_homemade);
 
-    suggestMutation.mutate(homemadeDishes, {
-      onSuccess: (data) => {
-        // Merge: homemade get suggested ingredients, bought get empty
-        const allDishes: DishWithSuggestions[] = [
-          ...data.dishes.map((d) => ({ ...d, is_homemade: true })),
-          ...boughtDishes.map((d) => ({
-            name: d.name,
-            price: d.price,
-            category: d.category,
-            is_homemade: false,
-            ingredients: [],
-          })),
-        ];
-        setDishesWithIngredients(allDishes);
-        setStep(2);
-      },
-    });
+    // Pre-fill purchased items: ingredient = product name, qty 1, unit piece
+    const purchasedWithIngredients: DishWithSuggestions[] = boughtDishes.map((d) => ({
+      name: d.name,
+      price: d.price,
+      category: d.category,
+      is_homemade: false,
+      ingredients: [{ name: d.name, quantity: 1, unit: 'piece' }],
+    }));
+
+    if (homemadeDishes.length > 0) {
+      // Get AI suggestions for homemade dishes only
+      suggestMutation.mutate(homemadeDishes, {
+        onSuccess: (data) => {
+          const allDishes: DishWithSuggestions[] = [
+            ...data.dishes.map((d) => ({ ...d, is_homemade: true })),
+            ...purchasedWithIngredients,
+          ];
+          setDishesWithIngredients(allDishes);
+          setStep(2);
+        },
+      });
+    } else {
+      // All purchased — skip AI suggestions entirely
+      setDishesWithIngredients(purchasedWithIngredients);
+      setStep(2);
+    }
   }
 
   function handleIngredientsConfirmed(dishes: DishWithSuggestions[]) {

@@ -16,30 +16,67 @@ SaaS PWA that tells independent restaurateurs what each dish really costs, and a
 
 ## Project structure
 
-Monorepo with /backend and /frontend at root.
+Monorepo with /backend and /frontend at root. Multi-stage Dockerfile (Node + Python). `scripts/start.sh` runs Alembic migrations (sync psycopg2) then launches uvicorn.
 
 ```
 margo/
 ├── CLAUDE.md
+├── PLAN.md
 ├── backend/
 │   ├── main.py                # FastAPI app entry, CORS, lifespan
 │   ├── app/
 │   │   ├── config.py          # pydantic-settings, env vars
 │   │   ├── database.py        # async engine, sessionmaker, get_db dependency
+│   │   ├── dependencies.py    # get_current_restaurant from JWT
 │   │   ├── models/            # SQLAlchemy ORM models
 │   │   ├── schemas/           # Pydantic request/response schemas
 │   │   ├── routers/           # API route modules
-│   │   └── services/          # Business logic (costing, OCR, matching, etc.)
+│   │   │   ├── auth.py        # magic link login/verify
+│   │   │   ├── ingredients.py # CRUD + auto-categorization backfill
+│   │   │   ├── recipes.py     # CRUD + food cost calculation
+│   │   │   ├── invoices.py    # upload, review, confirm, portion calc
+│   │   │   ├── onboarding.py  # AI menu extraction + batch creation
+│   │   │   ├── billing.py     # Stripe checkout, portal, plan info
+│   │   │   ├── dashboard.py   # KPIs + alerts
+│   │   │   └── simulator.py   # what-if price changes
+│   │   ├── services/
+│   │   │   ├── costing.py     # food cost calculation
+│   │   │   ├── ocr.py         # Claude Vision invoice OCR
+│   │   │   ├── matching.py    # fuzzy ingredient matching (pg_trgm)
+│   │   │   ├── billing.py     # Stripe + PLAN_LIMITS
+│   │   │   ├── unit_parser.py # parse_units_per_package, parse_volume_liters, SERVING_SIZES
+│   │   │   ├── utils.py       # guess_ingredient_category (Belgian keywords)
+│   │   │   ├── onboarding_ai.py # Claude menu extraction + ingredient suggestion
+│   │   │   ├── email_inbound.py # Resend webhook for factures@heymargo.be
+│   │   │   └── storage.py     # R2 upload with presigned URLs
+│   │   └── middleware/
+│   │       ├── plan_limits.py # require_recipe_quota, require_invoice_quota
+│   │       └── rate_limit.py  # AI + upload rate limiting
 │   ├── alembic/               # DB migrations
-│   ├── tests/                 # pytest + httpx
+│   ├── scripts/start.sh       # Alembic upgrade + uvicorn launch
+│   ├── tests/                 # pytest + httpx (123 tests)
 │   ├── Dockerfile
 │   └── pyproject.toml
 ├── frontend/
 │   ├── src/
-│   │   ├── components/        # Reusable UI components
-│   │   ├── pages/             # Route-level page components
-│   │   ├── hooks/             # Custom React hooks
-│   │   └── api/               # API client (fetch wrapper with JWT)
+│   │   ├── components/        # Reusable UI (Skeleton, UpgradeModal, Layout, Nav)
+│   │   ├── pages/
+│   │   │   ├── Recipes.tsx    # "Ma carte" — inline upload zone + drag&drop + manual add
+│   │   │   ├── RecipeDetail.tsx
+│   │   │   ├── Ingredients.tsx
+│   │   │   ├── Onboarding.tsx # 4-step: upload menu → review dishes → review ingredients → done
+│   │   │   ├── InvoiceUpload.tsx
+│   │   │   ├── InvoiceReview.tsx # line matching + recipe creation + portions
+│   │   │   ├── Dashboard.tsx
+│   │   │   └── Settings.tsx
+│   │   ├── hooks/
+│   │   │   ├── useRecipes.ts
+│   │   │   ├── useIngredients.ts
+│   │   │   ├── useInvoices.ts  # includes portion/volume fields
+│   │   │   ├── useOnboarding.ts # useExtractMenu, useSuggestIngredients, useConfirmOnboarding
+│   │   │   └── useBilling.ts
+│   │   └── api/
+│   │       └── client.ts      # fetch wrapper with JWT header injection
 │   ├── public/
 │   ├── vite.config.ts
 │   └── package.json
@@ -52,10 +89,11 @@ margo/
 - `cd backend && uvicorn main:app --reload` — run backend locally
 - `cd backend && alembic upgrade head` — apply DB migrations
 - `cd backend && alembic revision --autogenerate -m "description"` — create migration
-- `cd backend && pytest` — run all backend tests
+- `cd backend && pytest` — run all backend tests (123 tests, ~15min on remote DB)
 - `cd backend && pytest tests/test_recipes.py -v` — run specific test file
 - `cd frontend && npm run dev` — run frontend locally
 - `cd frontend && npm run build` — build frontend for production
+- `cd frontend && npx tsc --noEmit` — TypeScript type check
 
 ## Code style
 
@@ -67,11 +105,11 @@ margo/
 - French for user-facing text (UI labels, error messages, emails)
 - English for code (variable names, comments, docstrings, API endpoints)
 
-## Data model — 5 core tables
+## Data model — core tables
 
-1. **Restaurant** — id, name, owner_email, default_target_margin (default 30%)
-2. **Ingredient** — id, restaurant_id (FK), name, unit (g/kg/cl/l/piece), current_price, supplier_name, last_updated
-3. **Recipe** — id, restaurant_id (FK), name, selling_price, category, target_margin
+1. **Restaurant** — id, name, owner_email, plan (free/pro/multi), default_target_margin (30%), stripe_customer_id, stripe_subscription_id
+2. **Ingredient** — id, restaurant_id (FK), name, unit (g/kg/cl/l/piece), current_price, supplier_name, category (auto-guessed), last_updated
+3. **Recipe** — id, restaurant_id (FK), name, selling_price, category, is_homemade, target_margin, food_cost, food_cost_percent
 4. **RecipeIngredient** — id, recipe_id (FK), ingredient_id (FK), quantity, unit
 5. **Invoice** — id, restaurant_id (FK), image_url, supplier_name, invoice_date, source (email/upload/photo), format (xml/pdf/image), status (processing/pending_review/confirmed), extracted_lines (JSONB), matched_ingredients (JSONB)
 
@@ -85,6 +123,16 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - Margin thresholds: 🟢 <30% food cost, 🟠 30-35%, 🔴 >35% (configurable per restaurant)
 - Invoice matching: exact name → fuzzy (pg_trgm trigram) → suggest new ingredient
 - After user confirms a match, store it as IngredientAlias for future auto-matching
+- **Invoice portions:** unit_parser.py parses Belgian packaging patterns (24/3, CASIER 24, 6x25cl), calculates volume-based portions for beer/wine/spirit with interactive serving size
+- **Onboarding:** photo/PDF of menu → AI extracts dishes → AI suggests ingredients (homemade only) → purchased items auto-get ingredient = product name (qty 1, unit piece) → batch creation
+- **Plan limits:** free = 200 recipes (temporarily raised from 5), 3 invoices/month. Pro/Multi = unlimited.
+
+## Important patterns
+
+- **`_line_dict_to_response()`** in invoices.py eliminates duplication across upload/get/patch response building, computes portion fields on-read
+- **Transparent backfill:** auto-categorize ingredients with no category on GET /ingredients (via `guess_ingredient_category`)
+- **`unit_parser.py`** fallback: if OCR doesn't extract `units_per_package`, regex parses it from description (4-48 range sanity check)
+- **Onboarding navigate state:** Recipes.tsx → `/onboarding` with `{ dishes, skipExtract }` (pre-extracted) or `{ file }` (auto-extract)
 
 ## IMPORTANT rules
 
@@ -108,4 +156,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 8 — Monetization & Launch. See @PLAN.md for full roadmap.
+Sprint 19 — Auto-ingrédient for purchased products. See @PLAN.md for original roadmap.

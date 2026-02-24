@@ -25,6 +25,7 @@ from app.schemas.onboarding import (
 from app.services.costing import calculate_food_cost
 from app.services.onboarding_ai import extract_menu_from_image, suggest_ingredients_batch
 from app.services.storage import save_upload
+from app.services.utils import guess_ingredient_category
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +133,13 @@ async def confirm_onboarding(
     for dish in request.dishes:
         recipe_ingredients_data = []
 
+        # Auto-inject ingredient for purchased items (is_homemade=False) with no ingredients
+        if not dish.is_homemade and len(dish.ingredients) == 0:
+            from app.schemas.onboarding import OnboardingIngredient
+            dish.ingredients = [
+                OnboardingIngredient(name=dish.name, quantity=1, unit="piece")
+            ]
+
         for ing_data in dish.ingredients:
             # Look for existing ingredient (case-insensitive)
             result = await db.execute(
@@ -144,10 +152,12 @@ async def confirm_onboarding(
 
             if ingredient is None:
                 # Create new ingredient (without price — will be set from invoices)
+                guessed_cat = guess_ingredient_category(ing_data.name)
                 ingredient = Ingredient(
                     restaurant_id=restaurant.id,
                     name=ing_data.name,
                     unit=ing_data.unit,
+                    category=guessed_cat,
                 )
                 db.add(ingredient)
                 await db.flush()
