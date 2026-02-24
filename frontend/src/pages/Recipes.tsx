@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, BookOpen, Camera, ChevronDown, ChevronRight, Pencil, FileText, Upload, X, Loader2 } from 'lucide-react';
-import { useRecipes } from '../hooks/useRecipes';
+import { Plus, Search, BookOpen, Camera, ChevronDown, ChevronRight, Pencil, FileText, Upload, X, Loader2, Trash2 } from 'lucide-react';
+import { useRecipes, useDeleteRecipe, useDeleteAllRecipes } from '../hooks/useRecipes';
 import { useExtractMenu } from '../hooks/useOnboarding';
 import { SkeletonList } from '../components/Skeleton';
+import ConfirmModal from '../components/ConfirmModal';
 import type { RecipeListItem } from '../hooks/useRecipes';
 
 const STATUS_COLORS = {
@@ -28,14 +29,14 @@ function groupByCategory(recipes: RecipeListItem[]) {
   });
 }
 
-function RecipeCard({ recipe, onClick }: { recipe: RecipeListItem; onClick: () => void }) {
+function RecipeCard({ recipe, onClick, onDelete }: { recipe: RecipeListItem; onClick: () => void; onDelete: () => void }) {
   const colors = STATUS_COLORS[recipe.margin_status];
   return (
-    <button
-      onClick={onClick}
-      className="w-full bg-white rounded-xl border border-stone-200 px-4 py-3 flex items-center justify-between hover:border-stone-300 transition-colors text-left"
-    >
-      <div className="min-w-0 flex-1">
+    <div className="w-full bg-white rounded-xl border border-stone-200 px-4 py-3 flex items-center justify-between group">
+      <button
+        onClick={onClick}
+        className="min-w-0 flex-1 text-left hover:opacity-80 transition-opacity"
+      >
         <div className="font-medium text-stone-900 truncate flex items-center gap-1.5">
           {recipe.name}
           <span className={`text-xs px-1.5 py-0.5 rounded-full ${
@@ -49,7 +50,7 @@ function RecipeCard({ recipe, onClick }: { recipe: RecipeListItem; onClick: () =
         <div className="text-sm text-stone-500 flex gap-3 mt-0.5">
           <span>{recipe.selling_price.toFixed(2)} €</span>
         </div>
-      </div>
+      </button>
       <div className="flex items-center gap-2 ml-2 shrink-0">
         {recipe.food_cost_percent != null && (
           <span className={`text-sm font-semibold ${colors.text}`}>
@@ -59,8 +60,15 @@ function RecipeCard({ recipe, onClick }: { recipe: RecipeListItem; onClick: () =
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
         </span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="p-1.5 text-stone-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all"
+          title="Supprimer"
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -75,6 +83,26 @@ export default function Recipes() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const extractMutation = useExtractMenu();
+  const deleteOneMutation = useDeleteRecipe();
+  const deleteAllMutation = useDeleteAllRecipes();
+  const [deleting, setDeleting] = useState<RecipeListItem | null>(null);
+  const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState('');
+
+  function handleDeleteOne(id: number) {
+    deleteOneMutation.mutate(id, {
+      onSuccess: () => setDeleting(null),
+    });
+  }
+
+  function handleDeleteAll() {
+    deleteAllMutation.mutate(undefined, {
+      onSuccess: () => {
+        setShowDeleteAll(false);
+        setDeleteAllConfirm('');
+      },
+    });
+  }
 
   function handleMenuFile(file: File) {
     extractMutation.mutate(file, {
@@ -284,6 +312,7 @@ export default function Recipes() {
                         key={recipe.id}
                         recipe={recipe}
                         onClick={() => navigate(`/recipes/${recipe.id}`)}
+                        onDelete={() => setDeleting(recipe)}
                       />
                     ))}
                   </div>
@@ -294,6 +323,64 @@ export default function Recipes() {
           <p className="text-sm text-stone-400 text-center pt-2">
             {data?.total ?? 0} plat{(data?.total ?? 0) > 1 ? 's' : ''}
           </p>
+
+          {data && data.items.length > 0 && (
+            <button
+              onClick={() => setShowDeleteAll(true)}
+              className="text-xs text-stone-400 hover:text-red-500 transition-colors mt-4 flex items-center gap-1 mx-auto"
+            >
+              <Trash2 size={12} />
+              Supprimer tout le menu
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Modal suppression individuelle */}
+      {deleting && (
+        <ConfirmModal
+          title={`Supprimer « ${deleting.name} » ?`}
+          message="Cette action est irréversible. Le plat et ses ingrédients associés seront supprimés."
+          onConfirm={() => handleDeleteOne(deleting.id)}
+          onCancel={() => setDeleting(null)}
+          isLoading={deleteOneMutation.isPending}
+        />
+      )}
+
+      {/* Modal suppression totale */}
+      {showDeleteAll && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full space-y-4">
+            <h3 className="text-lg font-semibold text-stone-900">Supprimer tout le menu ?</h3>
+            <p className="text-sm text-stone-600">
+              Cette action supprimera les <strong>{data?.total ?? 0} recettes</strong> et ne peut pas être annulée.
+            </p>
+            <p className="text-sm text-stone-600">
+              Tapez <strong>SUPPRIMER</strong> pour confirmer :
+            </p>
+            <input
+              type="text"
+              value={deleteAllConfirm}
+              onChange={(e) => setDeleteAllConfirm(e.target.value)}
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="SUPPRIMER"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowDeleteAll(false); setDeleteAllConfirm(''); }}
+                className="flex-1 bg-stone-100 text-stone-700 py-2 rounded-lg text-sm font-medium hover:bg-stone-200"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDeleteAll}
+                disabled={deleteAllConfirm !== 'SUPPRIMER' || deleteAllMutation.isPending}
+                className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteAllMutation.isPending ? 'Suppression...' : 'Confirmer'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

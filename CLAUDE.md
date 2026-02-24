@@ -33,7 +33,7 @@ margo/
 │   │   ├── routers/           # API route modules
 │   │   │   ├── auth.py        # magic link login/verify
 │   │   │   ├── ingredients.py # CRUD + auto-categorization backfill
-│   │   │   ├── recipes.py     # CRUD + food cost calculation
+│   │   │   ├── recipes.py     # CRUD + food cost calculation + DELETE /all
 │   │   │   ├── invoices.py    # upload, review, confirm, portion calc
 │   │   │   ├── onboarding.py  # AI menu extraction + batch creation
 │   │   │   ├── billing.py     # Stripe checkout, portal, plan info
@@ -59,9 +59,9 @@ margo/
 │   └── pyproject.toml
 ├── frontend/
 │   ├── src/
-│   │   ├── components/        # Reusable UI (Skeleton, UpgradeModal, Layout, Nav)
+│   │   ├── components/        # Reusable UI (Skeleton, UpgradeModal, ConfirmModal, Layout, Nav)
 │   │   ├── pages/
-│   │   │   ├── Recipes.tsx    # "Ma carte" — inline upload zone + drag&drop + manual add
+│   │   │   ├── Recipes.tsx    # "Ma carte" — inline upload zone + drag&drop + manual add + delete individual/all
 │   │   │   ├── RecipeDetail.tsx
 │   │   │   ├── Ingredients.tsx
 │   │   │   ├── Onboarding.tsx # 4-step: upload menu → review dishes → review ingredients → done
@@ -70,7 +70,7 @@ margo/
 │   │   │   ├── Dashboard.tsx
 │   │   │   └── Settings.tsx
 │   │   ├── hooks/
-│   │   │   ├── useRecipes.ts
+│   │   │   ├── useRecipes.ts  # CRUD + useDeleteRecipe + useDeleteAllRecipes
 │   │   │   ├── useIngredients.ts
 │   │   │   ├── useInvoices.ts  # includes portion/volume fields
 │   │   │   ├── useOnboarding.ts # useExtractMenu, useSuggestIngredients, useConfirmOnboarding
@@ -134,6 +134,8 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - **Transparent backfill:** auto-categorize ingredients with no category on GET /ingredients (via `guess_ingredient_category`)
 - **`unit_parser.py`** fallback: if OCR doesn't extract `units_per_package`, regex parses it from description (4-48 range sanity check)
 - **Onboarding navigate state:** Recipes.tsx → `/onboarding` with `{ dishes, skipExtract }` (pre-extracted) or `{ file }` (auto-extract)
+- **Delete recipes:** Individual delete via Trash2 hover button + ConfirmModal. "Supprimer tout le menu" with SUPPRIMER text confirmation. Backend DELETE /all route placed before /{recipe_id} to avoid path collision.
+- **€ symbol:** Price input in StepDishes uses absolute-positioned € suffix (not in placeholder)
 
 ## IMPORTANT rules
 
@@ -157,4 +159,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 20 — Cocktails = homemade by default. See @PLAN.md for original roadmap.
+Sprint 21 — Euro symbol on price input + delete recipes (individual + all). See @PLAN.md for original roadmap.

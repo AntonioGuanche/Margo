@@ -114,6 +114,18 @@ async def list_recipes(
     )
 
 
+@router.delete("/all", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_all_recipes(
+    db: AsyncSession = Depends(get_db),
+    restaurant: Restaurant = Depends(get_current_restaurant),
+) -> None:
+    """Delete ALL recipes for the current restaurant. Destructive!"""
+    await db.execute(
+        delete(Recipe).where(Recipe.restaurant_id == restaurant.id)
+    )
+    await db.commit()
+
+
 @router.get("/{recipe_id}", response_model=RecipeResponse)
 async def get_recipe(
     recipe_id: int,

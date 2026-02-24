@@ -294,17 +294,20 @@ function StepDishes({
               </button>
             </div>
             <div className="flex gap-2 ml-6">
-              <input
-                type="number"
-                value={dish.price ?? ''}
-                onChange={(e) =>
-                  updateDish(index, { price: e.target.value ? parseFloat(e.target.value) : null })
-                }
-                className="w-24 border border-stone-300 rounded-lg px-2 py-1.5 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
-                placeholder="Prix €"
-                step="0.50"
-                inputMode="decimal"
-              />
+              <div className="relative w-24">
+                <input
+                  type="number"
+                  value={dish.price ?? ''}
+                  onChange={(e) =>
+                    updateDish(index, { price: e.target.value ? parseFloat(e.target.value) : null })
+                  }
+                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5 pr-7 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                  placeholder="Prix"
+                  step="0.50"
+                  inputMode="decimal"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-stone-400 pointer-events-none">€</span>
+              </div>
               <select
                 value={dish.category ?? 'plat'}
                 onChange={(e) => {

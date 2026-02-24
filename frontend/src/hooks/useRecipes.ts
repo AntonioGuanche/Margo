@@ -128,6 +128,19 @@ export function useDeleteRecipe() {
   });
 }
 
+export function useDeleteAllRecipes() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      await apiClient<void>('/api/recipes/all', { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
 export function useDashboard() {
   return useQuery({
     queryKey: ['dashboard'],
