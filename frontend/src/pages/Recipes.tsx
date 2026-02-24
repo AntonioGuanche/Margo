@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, BookOpen, Camera, ChevronDown, ChevronRight, Pencil, FileText, Upload, X, Loader2, Trash2 } from 'lucide-react';
 import { useRecipes, useDeleteRecipe, useDeleteAllRecipes } from '../hooks/useRecipes';
@@ -120,6 +120,12 @@ export default function Recipes() {
   };
 
   const recipes = data?.items ?? [];
+  const isEmpty = !isLoading && !recipes.length && !search;
+
+  useEffect(() => {
+    if (isEmpty) setShowUploadZone(true);
+  }, [isEmpty]);
+
   const grouped = groupByCategory(recipes);
 
   const toggleCategory = (cat: string) => {
@@ -136,26 +142,28 @@ export default function Recipes() {
             Ma carte
           </h2>
         </div>
-        <button
-          onClick={() => setShowUploadZone(!showUploadZone)}
-          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
-            showUploadZone
-              ? 'bg-stone-200 text-stone-700 hover:bg-stone-300'
-              : 'bg-orange-700 text-white hover:bg-orange-800'
-          }`}
-        >
-          {showUploadZone ? (
-            <>
-              <X size={16} />
-              Fermer
-            </>
-          ) : (
-            <>
-              <Plus size={16} />
-              Ajouter
-            </>
-          )}
-        </button>
+        {!isEmpty && (
+          <button
+            onClick={() => setShowUploadZone(!showUploadZone)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+              showUploadZone
+                ? 'bg-stone-200 text-stone-700 hover:bg-stone-300'
+                : 'bg-orange-700 text-white hover:bg-orange-800'
+            }`}
+          >
+            {showUploadZone ? (
+              <>
+                <X size={16} />
+                Fermer
+              </>
+            ) : (
+              <>
+                <Plus size={16} />
+                Ajouter
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -249,30 +257,14 @@ export default function Recipes() {
       {/* List grouped by category */}
       {isLoading ? (
         <SkeletonList count={5} />
-      ) : recipes.length === 0 ? (
+      ) : recipes.length === 0 && search ? (
         <div className="bg-white rounded-xl border border-stone-200 p-8 text-center">
           <BookOpen size={40} className="mx-auto text-stone-300 mb-3" />
           <p className="text-stone-600 font-medium mb-1">
-            {search
-              ? `Aucun plat trouvé pour « ${search} »`
-              : 'Aucun plat sur ta carte'}
+            Aucun plat trouvé pour « {search} »
           </p>
-          {!search && (
-            <>
-              <p className="text-sm text-stone-400 mb-4">
-                Commence par photographier ta carte !
-              </p>
-              <button
-                onClick={() => setShowUploadZone(true)}
-                className="bg-orange-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-orange-800 transition-colors inline-flex items-center gap-2"
-              >
-                <Camera size={16} />
-                Photographier ma carte
-              </button>
-            </>
-          )}
         </div>
-      ) : (
+      ) : recipes.length > 0 ? (
         <div className="space-y-4">
           {grouped.map(([category, items], idx) => {
             const isCollapsed = collapsed[category] ?? (idx > 0);
@@ -334,7 +326,7 @@ export default function Recipes() {
             </button>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Modal suppression individuelle */}
       {deleting && (

@@ -159,4 +159,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 21 — Euro symbol on price input + delete recipes (individual + all). See @PLAN.md for original roadmap.
+Sprint 22 — Upload zone shown by default when menu is empty (no more empty state screen). See @PLAN.md for original roadmap.
