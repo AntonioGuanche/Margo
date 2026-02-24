@@ -479,10 +479,16 @@ function StepDone({
 // ----- Main Onboarding page -----
 export default function Onboarding() {
   const location = useLocation();
-  const initialFile = (location.state as { file?: File } | null)?.file;
+  const passedState = location.state as {
+    dishes?: ExtractedDish[];
+    skipExtract?: boolean;
+    file?: File;
+  } | null;
 
-  const [step, setStep] = useState(0);
-  const [extractedDishes, setExtractedDishes] = useState<ExtractedDish[]>([]);
+  const [step, setStep] = useState(passedState?.skipExtract ? 1 : 0);
+  const [extractedDishes, setExtractedDishes] = useState<ExtractedDish[]>(
+    passedState?.dishes ?? [],
+  );
   const [dishesHomemadeMap, setDishesHomemadeMap] = useState<Record<string, boolean>>({});
   const [dishesWithIngredients, setDishesWithIngredients] = useState<DishWithSuggestions[]>([]);
   const [result, setResult] = useState<{ recipes: number; ingredients: number } | null>(null);
@@ -491,10 +497,10 @@ export default function Onboarding() {
   const confirmMutation = useConfirmOnboarding();
   const autoExtractMutation = useExtractMenu();
 
-  // Auto-extract if file passed from Ma Carte
+  // Auto-extract if file passed from Ma Carte (without pre-extracted dishes)
   useEffect(() => {
-    if (initialFile && step === 0) {
-      autoExtractMutation.mutate(initialFile, {
+    if (passedState?.file && !passedState?.skipExtract && step === 0) {
+      autoExtractMutation.mutate(passedState.file, {
         onSuccess: (data) => {
           setExtractedDishes(data.dishes);
           setStep(1);

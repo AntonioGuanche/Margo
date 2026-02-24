@@ -1,10 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, BookOpen, Camera, ChevronDown, ChevronRight, Pencil, FileText } from 'lucide-react';
+import { Plus, Search, BookOpen, Camera, ChevronDown, ChevronRight, Pencil, FileText, Upload, X, Loader2 } from 'lucide-react';
 import { useRecipes } from '../hooks/useRecipes';
-import { usePlanInfo } from '../hooks/useBilling';
+import { useExtractMenu } from '../hooks/useOnboarding';
 import { SkeletonList } from '../components/Skeleton';
-import UpgradeModal from '../components/UpgradeModal';
 import type { RecipeListItem } from '../hooks/useRecipes';
 
 const STATUS_COLORS = {
@@ -69,33 +68,28 @@ export default function Recipes() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const { data, isLoading } = useRecipes(search || undefined);
-  const { data: planInfo } = usePlanInfo();
-  const [showUpgrade, setShowUpgrade] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [showAddMenu, setShowAddMenu] = useState(false);
-  const addMenuRef = useRef<HTMLDivElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [showUploadZone, setShowUploadZone] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const atLimit =
-    planInfo?.max_recipes !== null &&
-    planInfo?.max_recipes !== undefined &&
-    planInfo.current_recipes >= planInfo.max_recipes;
-
-  // Close dropdown on click outside
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
-        setShowAddMenu(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const extractMutation = useExtractMenu();
 
   function handleMenuFile(file: File) {
-    navigate('/onboarding', { state: { file } });
+    extractMutation.mutate(file, {
+      onSuccess: (data) => {
+        navigate('/onboarding', { state: { dishes: data.dishes, skipExtract: true } });
+      },
+    });
   }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleMenuFile(file);
+  };
 
   const recipes = data?.items ?? [];
   const grouped = groupByCategory(recipes);
@@ -113,84 +107,27 @@ export default function Recipes() {
             <BookOpen size={22} className="text-orange-700" />
             Ma carte
           </h2>
-          {planInfo?.max_recipes !== null && planInfo?.max_recipes !== undefined && (
-            <span className="text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">
-              {planInfo.current_recipes}/{planInfo.max_recipes}
-            </span>
-          )}
         </div>
-        <div className="relative" ref={addMenuRef}>
-          <button
-            onClick={() => {
-              if (atLimit) {
-                setShowUpgrade(true);
-                return;
-              }
-              setShowAddMenu(!showAddMenu);
-            }}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
-              atLimit
-                ? 'bg-stone-200 text-stone-400 cursor-not-allowed'
-                : 'bg-orange-700 text-white hover:bg-orange-800'
-            }`}
-          >
-            <Plus size={16} />
-            Ajouter
-            {!atLimit && <ChevronDown size={14} />}
-          </button>
-
-          {showAddMenu && (
-            <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-xl border border-stone-200 shadow-lg z-50 overflow-hidden">
-              <button
-                onClick={() => { setShowAddMenu(false); navigate('/recipes/new'); }}
-                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-stone-50 text-left"
-              >
-                <Pencil size={18} className="text-stone-500" />
-                <div>
-                  <p className="text-sm font-medium text-stone-900">Ajouter manuellement</p>
-                  <p className="text-xs text-stone-500">Créer un plat avec prix et ingrédients</p>
-                </div>
-              </button>
-              <button
-                onClick={() => { setShowAddMenu(false); cameraRef.current?.click(); }}
-                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-stone-50 text-left border-t border-stone-100"
-              >
-                <Camera size={18} className="text-stone-500" />
-                <div>
-                  <p className="text-sm font-medium text-stone-900">Photographier ma carte</p>
-                  <p className="text-xs text-stone-500">L'IA extraira les plats et prix</p>
-                </div>
-              </button>
-              <button
-                onClick={() => { setShowAddMenu(false); fileRef.current?.click(); }}
-                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-stone-50 text-left border-t border-stone-100"
-              >
-                <FileText size={18} className="text-stone-500" />
-                <div>
-                  <p className="text-sm font-medium text-stone-900">Importer un fichier</p>
-                  <p className="text-xs text-stone-500">PDF ou image de votre carte</p>
-                </div>
-              </button>
-            </div>
+        <button
+          onClick={() => setShowUploadZone(!showUploadZone)}
+          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+            showUploadZone
+              ? 'bg-stone-200 text-stone-700 hover:bg-stone-300'
+              : 'bg-orange-700 text-white hover:bg-orange-800'
+          }`}
+        >
+          {showUploadZone ? (
+            <>
+              <X size={16} />
+              Fermer
+            </>
+          ) : (
+            <>
+              <Plus size={16} />
+              Ajouter
+            </>
           )}
-        </div>
-
-        {/* Hidden inputs for camera & file picker */}
-        <input
-          ref={cameraRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => e.target.files?.[0] && handleMenuFile(e.target.files[0])}
-        />
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".jpg,.jpeg,.png,.webp,.pdf"
-          className="hidden"
-          onChange={(e) => e.target.files?.[0] && handleMenuFile(e.target.files[0])}
-        />
+        </button>
       </div>
 
       {/* Search */}
@@ -204,6 +141,82 @@ export default function Recipes() {
           placeholder="Rechercher un plat..."
         />
       </div>
+
+      {/* Upload zone (inline, toggleable) */}
+      {showUploadZone && (
+        <div className="mb-4 space-y-3">
+          {extractMutation.isPending ? (
+            <div className="bg-white rounded-xl border border-stone-200 p-8 text-center">
+              <Loader2 size={40} className="text-orange-700 animate-spin mx-auto mb-3" />
+              <p className="text-stone-600 font-medium">Extraction des plats en cours...</p>
+              <p className="text-sm text-stone-400 mt-1">L'IA analyse votre carte</p>
+            </div>
+          ) : (
+            <div
+              onDrop={handleDrop}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
+                isDragging ? 'border-orange-500 bg-orange-50' : 'border-stone-300 bg-white'
+              }`}
+            >
+              <FileText size={36} className="mx-auto text-stone-300 mb-2" />
+              <p className="text-stone-600 font-medium mb-1">Glisse ta carte ici</p>
+              <p className="text-sm text-stone-400 mb-3">PDF ou image de ton menu</p>
+              <div className="flex items-center justify-center gap-3">
+                <label className="inline-flex items-center gap-2 bg-orange-700 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-orange-800 cursor-pointer transition-colors">
+                  <Upload size={16} />
+                  Choisir un fichier
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp,.pdf"
+                    className="hidden"
+                    onChange={(e) => e.target.files?.[0] && handleMenuFile(e.target.files[0])}
+                  />
+                </label>
+                <label className="inline-flex items-center gap-2 bg-white text-stone-700 px-4 py-2 rounded-xl text-sm font-medium border border-stone-300 hover:border-stone-400 cursor-pointer transition-colors">
+                  <Camera size={16} />
+                  Photo
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => e.target.files?.[0] && handleMenuFile(e.target.files[0])}
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Separator */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 border-t border-stone-200" />
+            <span className="text-xs text-stone-400">ou</span>
+            <div className="flex-1 border-t border-stone-200" />
+          </div>
+
+          {/* Manual add button */}
+          <button
+            onClick={() => navigate('/recipes/new')}
+            className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-stone-50 transition-colors"
+          >
+            <Pencil size={18} className="text-stone-500" />
+            <div className="text-left">
+              <p className="text-sm font-medium text-stone-900">Ajouter un plat manuellement</p>
+              <p className="text-xs text-stone-500">Nom, prix, catégorie et ingrédients</p>
+            </div>
+          </button>
+
+          {extractMutation.isError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              {extractMutation.error.message}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* List grouped by category */}
       {isLoading ? (
@@ -222,7 +235,7 @@ export default function Recipes() {
                 Commence par photographier ta carte !
               </p>
               <button
-                onClick={() => navigate('/onboarding')}
+                onClick={() => setShowUploadZone(true)}
                 className="bg-orange-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-orange-800 transition-colors inline-flex items-center gap-2"
               >
                 <Camera size={16} />
@@ -283,12 +296,6 @@ export default function Recipes() {
           </p>
         </div>
       )}
-
-      <UpgradeModal
-        show={showUpgrade}
-        onClose={() => setShowUpgrade(false)}
-        message="Tu as atteint la limite de 5 recettes pour le plan gratuit. Passe au Pro pour un accès illimité."
-      />
     </div>
   );
 }
