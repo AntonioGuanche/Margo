@@ -32,6 +32,7 @@ from app.services.alerts import check_and_create_alerts
 from app.services.costing import recalculate_recipes_for_ingredient
 from app.services.invoice_router import parse_invoice_file
 from app.services.matching import match_invoice_lines, save_alias
+from app.services.unit_parser import parse_units_per_package
 from app.services.utils import guess_ingredient_category
 from app.services.storage import save_upload
 
@@ -55,6 +56,10 @@ def _build_line_responses(match_results: list) -> list[dict]:
     """Convert MatchResult list to serializable dicts for JSONB storage."""
     lines = []
     for mr in match_results:
+        # Use OCR value if available, otherwise apply deterministic fallback
+        upp = mr.invoice_line.units_per_package
+        if upp is None:
+            upp = parse_units_per_package(mr.invoice_line.description)
         lines.append({
             "description": mr.invoice_line.description,
             "quantity": mr.invoice_line.quantity,
@@ -63,7 +68,7 @@ def _build_line_responses(match_results: list) -> list[dict]:
             "total_price": mr.invoice_line.total_price,
             "matched_ingredient_id": mr.matched_ingredient_id,
             "matched_ingredient_name": mr.matched_ingredient_name,
-            "units_per_package": mr.invoice_line.units_per_package,
+            "units_per_package": upp,
             "match_confidence": mr.confidence,
             "suggestions": mr.suggestions,
         })
@@ -245,13 +250,17 @@ async def get_invoice(
     lines = []
     if invoice.extracted_lines:
         for ld in invoice.extracted_lines:
+            # Fallback: parse units_per_package from description if not stored
+            upp = ld.get("units_per_package")
+            if upp is None:
+                upp = parse_units_per_package(ld.get("description", ""))
             lines.append(InvoiceLineResponse(
                 description=ld["description"],
                 quantity=ld.get("quantity"),
                 unit=ld.get("unit"),
                 unit_price=ld.get("unit_price"),
                 total_price=ld.get("total_price"),
-                units_per_package=ld.get("units_per_package"),
+                units_per_package=upp,
                 matched_ingredient_id=ld.get("matched_ingredient_id"),
                 matched_ingredient_name=ld.get("matched_ingredient_name"),
                 match_confidence=ld.get("match_confidence", "none"),
@@ -491,13 +500,16 @@ async def patch_invoice(
     lines = []
     if invoice.extracted_lines:
         for ld in invoice.extracted_lines:
+            upp = ld.get("units_per_package")
+            if upp is None:
+                upp = parse_units_per_package(ld.get("description", ""))
             lines.append(InvoiceLineResponse(
                 description=ld["description"],
                 quantity=ld.get("quantity"),
                 unit=ld.get("unit"),
                 unit_price=ld.get("unit_price"),
                 total_price=ld.get("total_price"),
-                units_per_package=ld.get("units_per_package"),
+                units_per_package=upp,
                 matched_ingredient_id=ld.get("matched_ingredient_id"),
                 matched_ingredient_name=ld.get("matched_ingredient_name"),
                 match_confidence=ld.get("match_confidence", "none"),

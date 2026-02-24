@@ -15,6 +15,7 @@ from app.models.restaurant import Restaurant
 from app.services.invoice_router import parse_invoice_file
 from app.services.matching import match_invoice_lines
 from app.services.storage import UPLOAD_DIR
+from app.services.unit_parser import parse_units_per_package
 
 logger = logging.getLogger(__name__)
 
@@ -146,12 +147,16 @@ async def process_inbound_email(
         # Build serializable line data
         line_dicts = []
         for mr in match_results:
+            upp = mr.invoice_line.units_per_package
+            if upp is None:
+                upp = parse_units_per_package(mr.invoice_line.description)
             line_dicts.append({
                 "description": mr.invoice_line.description,
                 "quantity": mr.invoice_line.quantity,
                 "unit": mr.invoice_line.unit,
                 "unit_price": mr.invoice_line.unit_price,
                 "total_price": mr.invoice_line.total_price,
+                "units_per_package": upp,
                 "matched_ingredient_id": mr.matched_ingredient_id,
                 "matched_ingredient_name": mr.matched_ingredient_name,
                 "match_confidence": mr.confidence,

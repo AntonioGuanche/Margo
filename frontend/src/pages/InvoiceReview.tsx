@@ -276,13 +276,20 @@ function LineRow({
           )}
 
           {/* Add to recipe / create recipe */}
-          {(line.ingredient_id || line.create_ingredient_name) && (
-            <>
-              {!showRecipeLink ? (
-                <button
-                  onClick={() => setShowRecipeLink(true)}
-                  className="text-xs text-stone-500 hover:text-blue-600 flex items-center gap-1 mt-1"
-                >
+          <>
+            {!showRecipeLink ? (
+              <button
+                onClick={() => {
+                  setShowRecipeLink(true);
+                  // Auto-create ingredient if none selected yet
+                  if (!line.ingredient_id && !line.create_ingredient_name) {
+                    setShowCreate(true);
+                    setNewName(line.description);
+                    onChange({ create_ingredient_name: line.description });
+                  }
+                }}
+                className="text-xs text-stone-500 hover:text-blue-600 flex items-center gap-1 mt-1"
+              >
                   <Link2 size={12} />
                   Ajouter à une recette
                 </button>
@@ -428,8 +435,7 @@ function LineRow({
                   )}
                 </div>
               )}
-            </>
-          )}
+          </>
         </div>
       )}
     </div>

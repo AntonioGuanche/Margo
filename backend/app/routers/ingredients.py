@@ -21,6 +21,7 @@ from app.schemas.ingredient import (
     PriceHistoryResponse,
 )
 from app.services.costing import recalculate_recipes_for_ingredient
+from app.services.utils import guess_ingredient_category
 
 router = APIRouter()
 
@@ -47,6 +48,17 @@ async def list_ingredients(
     items_query = base_query.order_by(Ingredient.name).offset(skip).limit(limit)
     result = await db.execute(items_query)
     items = result.scalars().all()
+
+    # Backfill: auto-categorize ingredients that have no category
+    needs_flush = False
+    for ing in items:
+        if ing.category is None:
+            guessed = guess_ingredient_category(ing.name)
+            if guessed:
+                ing.category = guessed
+                needs_flush = True
+    if needs_flush:
+        await db.flush()
 
     return IngredientListResponse(
         items=[IngredientResponse.model_validate(item) for item in items],

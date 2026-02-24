@@ -16,7 +16,9 @@ def guess_ingredient_category(name: str) -> str | None:
         "martini", "porto", "cognac", "crémant", "bag in box", "sauvignon",
         "merlot", "chardonnay", "pinot", "cabernet", "rosé", "ipa",
         "blonde", "brune", "triple", "quadruple", "spa ", "perrier",
-        "san pellegrino", "pellegrino", "cristaline",
+        "san pellegrino", "pellegrino", "cristaline", "orangina",
+        "ice tea", "lipton", "godefroy", "semois", "pays d'oc",
+        "barisart", "reine", "bru", "vittel", "evian", "contrex",
     ]
     if any(kw in name_lower for kw in boissons_kw):
         return "boissons"
