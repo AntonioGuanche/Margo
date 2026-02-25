@@ -136,7 +136,8 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - **`unit_parser.py`** fallback: if OCR doesn't extract `units_per_package`, regex parses it from description (4-48 range sanity check)
 - **Onboarding navigate state:** Recipes.tsx → `/onboarding` with `{ dishes, skipExtract }` (pre-extracted) or `{ file }` (auto-extract)
 - **Delete recipes:** Individual delete via Trash2 hover button + ConfirmModal. "Supprimer tout le menu" with SUPPRIMER text confirmation. Backend DELETE /all route placed before /{recipe_id} to avoid path collision.
-- **Delete invoices:** Trash2 hover button on non-confirmed invoices in Invoices.tsx + ConfirmModal. Backend DELETE /{invoice_id} rejects confirmed invoices.
+- **Delete invoices:** Trash2 hover button on ALL invoices (including confirmed) in Invoices.tsx + ConfirmModal. Backend DELETE /{invoice_id} allows deleting any invoice.
+- **Ingredient chips:** InvoiceReview.tsx shows assigned ingredients as orange chips (with match score % and X button) instead of dropdown. "Changer" button reveals dropdown override. Create mode shows green "Sera créé" badge.
 - **MenuUploadZone:** Shared component (components/MenuUploadZone.tsx) used in Dashboard empty state and Recipes page. Supports drag&drop, multi-file sequential extraction with progress, camera, optional manual add button.
 - **€ symbol:** Price input in StepDishes uses absolute-positioned € suffix (not in placeholder)
 
@@ -150,6 +151,14 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - Alembic migrations must be created for every model change
 - French UI, English code — this is non-negotiable
 
+## Workflow après chaque sprint ("comme d'hab")
+
+1. Faire un **résumé** clair de l'action réalisée
+2. Lancer les tests (`pytest`), le type-check (`npx tsc --noEmit`) et le build (`npm run build`) avant de commit
+3. **Commit** (message en français) + **push**
+4. **Git archive** sur le Bureau : `git archive -o "/c/Users/Utilisateur/Desktop/margo.zip" HEAD`
+5. **Mettre à jour CLAUDE.md** (section "Current sprint" + nouveaux patterns/changements)
+
 ## Environment variables
 
 See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY, R2_*, RESEND_API_KEY, STRIPE_*, FRONTEND_URL, ENVIRONMENT
@@ -162,4 +171,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 23 — Shared MenuUploadZone component, multi-recipe invoice lines, delete invoice from list, unlimited free plan. See @PLAN.md for original roadmap.
+Sprint 25 — Ingredient chips in InvoiceReview (replace dropdown with chip when assigned). Previous: Sprint 24 (allow deleting confirmed invoices), Sprint 23 (MenuUploadZone, multi-recipe invoice lines, delete invoice, unlimited free plan). See @PLAN.md for original roadmap.
