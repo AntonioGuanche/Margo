@@ -327,8 +327,8 @@ async def test_delete_pending(client, auth_headers, xml_file_path):
     assert resp.status_code == 204
 
 
-async def test_delete_confirmed_fails(client, auth_headers, db_session, restaurant, xml_file_path):
-    """Delete a confirmed invoice → 400."""
+async def test_delete_confirmed_allowed(client, auth_headers, db_session, restaurant, xml_file_path):
+    """Delete a confirmed invoice → 204 (allowed since Sprint 24)."""
     with open(xml_file_path, "rb") as f:
         upload_resp = await client.post(
             "/api/invoices/upload",
@@ -344,9 +344,9 @@ async def test_delete_confirmed_fails(client, auth_headers, db_session, restaura
         headers=auth_headers,
     )
 
-    # Try to delete
+    # Delete confirmed invoice — now allowed
     resp = await client.delete(f"/api/invoices/{invoice_id}", headers=auth_headers)
-    assert resp.status_code == 403
+    assert resp.status_code == 204
 
 
 async def test_invoices_protected(client):

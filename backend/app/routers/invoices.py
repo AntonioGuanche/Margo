@@ -571,11 +571,5 @@ async def delete_invoice(
             detail="Facture introuvable.",
         )
 
-    if invoice.status == "confirmed":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Impossible de supprimer une facture confirmée.",
-        )
-
     await db.delete(invoice)
     await db.flush()

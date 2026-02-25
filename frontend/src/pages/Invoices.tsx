@@ -78,15 +78,13 @@ function InvoiceRow({ invoice, onClick, onDelete }: { invoice: InvoiceListItem; 
           </span>
         )}
         <StatusBadge status={invoice.status} />
-        {invoice.status !== 'confirmed' && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="p-1.5 text-stone-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all"
-            title="Supprimer"
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="p-1.5 text-stone-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all"
+          title="Supprimer"
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
     </div>
   );
