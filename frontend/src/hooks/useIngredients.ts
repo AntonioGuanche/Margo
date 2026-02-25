@@ -41,7 +41,7 @@ export function useIngredients(search?: string) {
     queryFn: () => {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
-      params.set('limit', '200');
+      params.set('limit', '500');
       const qs = params.toString();
       return apiClient<IngredientListResponse>(`/api/ingredients${qs ? `?${qs}` : ''}`);
     },

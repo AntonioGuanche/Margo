@@ -75,6 +75,7 @@ function RecipeCard({ recipe, onClick, onDelete }: { recipe: RecipeListItem; onC
 export default function Recipes() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'category' | 'food_cost'>('category');
   const { data, isLoading } = useRecipes(search || undefined);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [showUploadZone, setShowUploadZone] = useState(false);
@@ -108,6 +109,9 @@ export default function Recipes() {
   }, [isEmpty]);
 
   const grouped = groupByCategory(recipes);
+  const sortedByFoodCost = sortBy === 'food_cost'
+    ? [...recipes].sort((a, b) => (b.food_cost_percent ?? 0) - (a.food_cost_percent ?? 0))
+    : null;
 
   const toggleCategory = (cat: string) => {
     setCollapsed((prev) => ({ ...prev, [cat]: !prev[cat] }));
@@ -124,26 +128,34 @@ export default function Recipes() {
           </h2>
         </div>
         {!isEmpty && (
-          <button
-            onClick={() => setShowUploadZone(!showUploadZone)}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
-              showUploadZone
-                ? 'bg-stone-200 text-stone-700 hover:bg-stone-300'
-                : 'bg-orange-700 text-white hover:bg-orange-800'
-            }`}
-          >
-            {showUploadZone ? (
-              <>
-                <X size={16} />
-                Fermer
-              </>
-            ) : (
-              <>
-                <Plus size={16} />
-                Ajouter
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSortBy(sortBy === 'category' ? 'food_cost' : 'category')}
+              className="text-xs text-stone-500 hover:text-orange-700 border border-stone-200 rounded-lg px-2.5 py-1.5 transition-colors"
+            >
+              {sortBy === 'category' ? '↕ Trier par food cost' : '↕ Trier par catégorie'}
+            </button>
+            <button
+              onClick={() => setShowUploadZone(!showUploadZone)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+                showUploadZone
+                  ? 'bg-stone-200 text-stone-700 hover:bg-stone-300'
+                  : 'bg-orange-700 text-white hover:bg-orange-800'
+              }`}
+            >
+              {showUploadZone ? (
+                <>
+                  <X size={16} />
+                  Fermer
+                </>
+              ) : (
+                <>
+                  <Plus size={16} />
+                  Ajouter
+                </>
+              )}
+            </button>
+          </div>
         )}
       </div>
 
@@ -182,55 +194,78 @@ export default function Recipes() {
         </div>
       ) : recipes.length > 0 ? (
         <div className="space-y-4">
-          {grouped.map(([category, items], idx) => {
-            const isCollapsed = collapsed[category] ?? (idx > 0);
-            const avgCost =
-              items.filter((r) => r.food_cost_percent != null).length > 0
-                ? items
-                    .filter((r) => r.food_cost_percent != null)
-                    .reduce((sum, r) => sum + (r.food_cost_percent ?? 0), 0) /
-                  items.filter((r) => r.food_cost_percent != null).length
-                : null;
+          {sortBy === 'category' ? (
+            // Grouped by category
+            <>
+              {grouped.map(([category, items]) => {
+                const isCollapsed = collapsed[category] ?? false;
+                const avgCost =
+                  items.filter((r) => r.food_cost_percent != null).length > 0
+                    ? items
+                        .filter((r) => r.food_cost_percent != null)
+                        .reduce((sum, r) => sum + (r.food_cost_percent ?? 0), 0) /
+                      items.filter((r) => r.food_cost_percent != null).length
+                    : null;
 
-            return (
-              <div key={category}>
-                <button
-                  onClick={() => toggleCategory(category)}
-                  className="flex items-center gap-2 w-full text-left mb-2"
-                >
-                  {isCollapsed ? (
-                    <ChevronRight size={14} className="text-stone-400" />
-                  ) : (
-                    <ChevronDown size={14} className="text-stone-400" />
-                  )}
-                  <span className="text-xs font-semibold text-stone-500 uppercase tracking-wide">
-                    {category} ({items.length})
-                  </span>
-                  {avgCost != null && (
-                    <span className="text-xs text-stone-400">
-                      — moy. {avgCost.toFixed(1)}%
-                    </span>
-                  )}
-                </button>
+                return (
+                  <div key={category}>
+                    <button
+                      onClick={() => toggleCategory(category)}
+                      className="flex items-center gap-2 w-full text-left mb-2"
+                    >
+                      {isCollapsed ? (
+                        <ChevronRight size={14} className="text-stone-400" />
+                      ) : (
+                        <ChevronDown size={14} className="text-stone-400" />
+                      )}
+                      <span className="text-xs font-semibold text-stone-500 uppercase tracking-wide">
+                        {category} ({items.length})
+                      </span>
+                      {avgCost != null && (
+                        <span className="text-xs text-stone-400">
+                          — moy. {avgCost.toFixed(1)}%
+                        </span>
+                      )}
+                    </button>
 
-                {!isCollapsed && (
-                  <div className="space-y-2">
-                    {items.map((recipe) => (
-                      <RecipeCard
-                        key={recipe.id}
-                        recipe={recipe}
-                        onClick={() => navigate(`/recipes/${recipe.id}`)}
-                        onDelete={() => setDeleting(recipe)}
-                      />
-                    ))}
+                    {!isCollapsed && (
+                      <div className="space-y-2">
+                        {items.map((recipe) => (
+                          <RecipeCard
+                            key={recipe.id}
+                            recipe={recipe}
+                            onClick={() => navigate(`/recipes/${recipe.id}`)}
+                            onDelete={() => setDeleting(recipe)}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </>
+          ) : (
+            // Flat list sorted by food cost
+            <div className="space-y-2">
+              {sortedByFoodCost!.map((recipe) => (
+                <RecipeCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  onClick={() => navigate(`/recipes/${recipe.id}`)}
+                  onDelete={() => setDeleting(recipe)}
+                />
+              ))}
+            </div>
+          )}
+
           <p className="text-sm text-stone-400 text-center pt-2">
             {data?.total ?? 0} plat{(data?.total ?? 0) > 1 ? 's' : ''}
           </p>
+          {data && data.total > data.items.length && (
+            <p className="text-xs text-amber-600 text-center mt-2">
+              Affichage de {data.items.length} sur {data.total}. Utilise la recherche pour affiner.
+            </p>
+          )}
 
           {data && data.items.length > 0 && (
             <button

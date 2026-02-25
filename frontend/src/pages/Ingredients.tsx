@@ -161,8 +161,8 @@ export default function Ingredients() {
         </div>
       ) : (
         <div className="space-y-4">
-          {grouped.map(([category, items], idx) => {
-            const isCollapsed = collapsed[category] ?? (idx > 0);
+          {grouped.map(([category, items]) => {
+            const isCollapsed = collapsed[category] ?? false;
 
             return (
               <div key={category}>
@@ -189,7 +189,7 @@ export default function Ingredients() {
                             <div className="font-medium text-stone-900 truncate">
                               {ingredient.name}
                             </div>
-                            <div className="text-sm text-stone-500 flex gap-3 mt-0.5">
+                            <div className="text-sm text-stone-500 flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                               <span>{UNIT_LABELS[ingredient.unit]}</span>
                               {ingredient.current_price != null && (
                                 <span className="text-emerald-600 font-medium">
@@ -197,7 +197,12 @@ export default function Ingredients() {
                                 </span>
                               )}
                               {ingredient.supplier_name && (
-                                <span className="truncate">{ingredient.supplier_name}</span>
+                                <span className="text-stone-400">📦 {ingredient.supplier_name}</span>
+                              )}
+                              {ingredient.last_updated && (
+                                <span className="text-stone-400 text-xs">
+                                  · {new Date(ingredient.last_updated).toLocaleDateString('fr-BE')}
+                                </span>
                               )}
                             </div>
                           </div>
@@ -243,6 +248,11 @@ export default function Ingredients() {
           <p className="text-sm text-stone-400 text-center pt-2">
             {data?.total ?? 0} ingrédient{(data?.total ?? 0) > 1 ? 's' : ''}
           </p>
+          {data && data.total > data.items.length && (
+            <p className="text-xs text-amber-600 text-center mt-2">
+              Affichage de {data.items.length} sur {data.total}. Utilise la recherche pour affiner.
+            </p>
+          )}
         </div>
       )}
 

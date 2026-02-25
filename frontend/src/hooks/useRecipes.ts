@@ -77,7 +77,7 @@ export function useRecipes(search?: string, sortBy?: string, sortOrder?: string)
       if (search) params.set('search', search);
       if (sortBy) params.set('sort_by', sortBy);
       if (sortOrder) params.set('sort_order', sortOrder);
-      params.set('limit', '200');
+      params.set('limit', '500');
       const qs = params.toString();
       return apiClient<RecipeListResponse>(`/api/recipes${qs ? `?${qs}` : ''}`);
     },

@@ -100,13 +100,14 @@ interface InvoiceConfirmResponse {
 
 // --- Hooks ---
 
-export function useInvoices(status?: string) {
+export function useInvoices(status?: string, search?: string) {
   const params = new URLSearchParams();
   if (status) params.set('status', status);
+  if (search) params.set('search', search);
   const qs = params.toString();
 
   return useQuery<InvoiceListResponse>({
-    queryKey: ['invoices', status],
+    queryKey: ['invoices', status, search],
     queryFn: () => apiClient<InvoiceListResponse>(`/api/invoices${qs ? `?${qs}` : ''}`),
   });
 }

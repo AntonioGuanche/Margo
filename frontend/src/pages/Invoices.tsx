@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Clock, CheckCircle, Upload, Trash2 } from 'lucide-react';
+import { FileText, Plus, Clock, CheckCircle, Upload, Trash2, Search } from 'lucide-react';
 import { useInvoices, useDeleteInvoice } from '../hooks/useInvoices';
 import { SkeletonList } from '../components/Skeleton';
 import ConfirmModal from '../components/ConfirmModal';
@@ -92,7 +92,12 @@ function InvoiceRow({ invoice, onClick, onDelete }: { invoice: InvoiceListItem; 
 
 export default function Invoices() {
   const navigate = useNavigate();
-  const { data, isLoading } = useInvoices();
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending_review' | 'confirmed'>('all');
+  const { data, isLoading } = useInvoices(
+    statusFilter === 'all' ? undefined : statusFilter,
+    search || undefined,
+  );
   const deleteMutation = useDeleteInvoice();
   const [deleting, setDeleting] = useState<InvoiceListItem | null>(null);
 
@@ -126,6 +131,29 @@ export default function Invoices() {
           <Plus size={16} />
           Importer
         </button>
+      </div>
+
+      {/* Search + filter */}
+      <div className="flex gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full border border-stone-300 rounded-lg pl-10 pr-3 py-2 text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+            placeholder="Rechercher un fournisseur..."
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as any)}
+          className="border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+        >
+          <option value="all">Toutes</option>
+          <option value="pending_review">En attente</option>
+          <option value="confirmed">Confirmées</option>
+        </select>
       </div>
 
       {invoices.length === 0 ? (

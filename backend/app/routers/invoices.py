@@ -229,6 +229,7 @@ async def upload_invoice(
 @router.get("", response_model=InvoiceListResponse)
 async def list_invoices(
     status: str | None = Query(None, description="Filter by status"),
+    search: str | None = Query(None, description="Search by supplier name"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -239,14 +240,19 @@ async def list_invoices(
 
     if status:
         query = query.where(Invoice.status == status)
+    if search:
+        query = query.where(Invoice.supplier_name.ilike(f"%{search}%"))
 
     # Count total
     count_query = select(func.count()).select_from(query.subquery())
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
 
-    # Fetch page
-    query = query.order_by(Invoice.created_at.desc()).offset(skip).limit(limit)
+    # Fetch page — sort by invoice_date (nulls last), then created_at
+    query = query.order_by(
+        Invoice.invoice_date.desc().nulls_last(),
+        Invoice.created_at.desc(),
+    ).offset(skip).limit(limit)
     result = await db.execute(query)
     invoices = result.scalars().all()
 
