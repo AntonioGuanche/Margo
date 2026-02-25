@@ -131,6 +131,24 @@ async def delete_all_recipes(
     await db.commit()
 
 
+@router.post("/recalculate-all")
+async def recalculate_all_recipes(
+    restaurant: Restaurant = Depends(get_current_restaurant),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Recalculate food cost for all recipes in the restaurant."""
+    result = await db.execute(
+        select(Recipe.id).where(Recipe.restaurant_id == restaurant.id)
+    )
+    recipe_ids = result.scalars().all()
+    count = 0
+    for rid in recipe_ids:
+        await recalculate_recipe(db, rid)
+        count += 1
+    await db.commit()
+    return {"recalculated": count}
+
+
 @router.get("/{recipe_id}", response_model=RecipeResponse)
 async def get_recipe(
     recipe_id: int,

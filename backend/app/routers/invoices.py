@@ -374,6 +374,9 @@ async def confirm_invoice(
             if ingredient:
                 old_price = ingredient.current_price
                 ingredient.current_price = line.unit_price
+                # Sync ingredient unit with invoice unit (price is per this unit)
+                if line.unit and line.unit.lower() in ("g", "kg", "ml", "cl", "l", "piece", "pce"):
+                    ingredient.unit = line.unit.lower()
                 ingredient.last_updated = dt.datetime.utcnow()
                 if invoice.supplier_name:
                     ingredient.supplier_name = invoice.supplier_name

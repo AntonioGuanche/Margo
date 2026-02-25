@@ -363,6 +363,69 @@ async def test_cascade_recalculate_with_conversion(
     assert abs(resp.json()["food_cost"] - 3.0) < 0.01
 
 
+async def test_recalculate_all(client: AsyncClient, auth_headers: dict, db_session, restaurant):
+    """POST /api/recipes/recalculate-all → all recipes food costs updated."""
+    # Create ingredient
+    fromage = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Fromage test",
+        unit="kg",
+        current_price=20.0,
+    )
+    db_session.add(fromage)
+    await db_session.flush()
+    await db_session.refresh(fromage)
+
+    # Create 2 recipes with stale food costs (simulating pre-conversion bug)
+    from app.models.recipe import Recipe, RecipeIngredient
+
+    r1 = Recipe(
+        restaurant_id=restaurant.id,
+        name="Plat A",
+        selling_price=10.0,
+        is_homemade=True,
+        food_cost=999.0,  # intentionally wrong
+        food_cost_percent=999.0,
+    )
+    r2 = Recipe(
+        restaurant_id=restaurant.id,
+        name="Plat B",
+        selling_price=8.0,
+        is_homemade=True,
+        food_cost=999.0,
+        food_cost_percent=999.0,
+    )
+    db_session.add_all([r1, r2])
+    await db_session.flush()
+    await db_session.refresh(r1)
+    await db_session.refresh(r2)
+
+    # Add 100g of fromage to each recipe
+    for recipe in [r1, r2]:
+        ri = RecipeIngredient(
+            recipe_id=recipe.id,
+            ingredient_id=fromage.id,
+            quantity=100,
+            unit="g",
+        )
+        db_session.add(ri)
+    await db_session.flush()
+
+    # Call recalculate-all
+    resp = await client.post("/api/recipes/recalculate-all", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["recalculated"] == 2
+
+    # Verify recalculated: 100g → 0.1kg × 20€/kg = 2.0€
+    await db_session.refresh(r1)
+    assert r1.food_cost == pytest.approx(2.0, abs=0.01)
+    assert r1.food_cost_percent == pytest.approx(20.0, abs=0.1)
+
+    await db_session.refresh(r2)
+    assert r2.food_cost == pytest.approx(2.0, abs=0.01)
+    assert r2.food_cost_percent == pytest.approx(25.0, abs=0.1)
+
+
 async def test_cross_restaurant_isolation(client: AsyncClient, db_session, auth_headers: dict, ingredients: list[Ingredient]):
     """Cannot access recipes from another restaurant."""
     from app.models.restaurant import Restaurant
