@@ -172,4 +172,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 28 — Fix RecipeLinker auto-suggestion reset when ingredient changes (autoSuggested flag reset on ingredientId change). Previous: Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component, GET /ingredients/{id}/recipes), Sprint 25 (ingredient chips), Sprint 24 (delete confirmed invoices), Sprint 23 (MenuUploadZone, multi-recipe invoice lines, delete invoice, unlimited free plan). See @PLAN.md for original roadmap.
+Sprint 28b — Batch recipe pre-fill (POST /ingredients/recipes-batch) + name-based fallback. RecipeLinker kept for ingredient change only. Previous: Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component, GET /ingredients/{id}/recipes), Sprint 25 (ingredient chips), Sprint 24 (delete confirmed invoices), Sprint 23 (MenuUploadZone, multi-recipe invoice lines, delete invoice, unlimited free plan). See @PLAN.md for original roadmap.

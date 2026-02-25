@@ -717,6 +717,7 @@ export default function InvoiceReview() {
 
   const [lines, setLines] = useState<LineState[]>([]);
   const [initialized, setInitialized] = useState(false);
+  const [recipesPreFilled, setRecipesPreFilled] = useState(false);
   const [editSupplier, setEditSupplier] = useState('');
   const [editDate, setEditDate] = useState('');
   const [showIgnored, setShowIgnored] = useState(true);
@@ -750,6 +751,96 @@ export default function InvoiceReview() {
     setInitialized(true);
   }
 
+  const allIngredients: IngredientItem[] = (ingredientsData?.items ?? []).map(
+    (i: { id: number; name: string }) => ({ id: i.id, name: i.name }),
+  );
+
+  const recipesList = (recipesData?.items ?? []).map((r) => ({ id: r.id, name: r.name }));
+
+  // Batch-fetch recipes for all matched ingredients after init
+  useEffect(() => {
+    if (!initialized || recipesPreFilled || lines.length === 0) return;
+
+    const ingredientIds = [
+      ...new Set(
+        lines
+          .filter((l) => l.ingredient_id && l.recipe_links.length === 0)
+          .map((l) => l.ingredient_id!),
+      ),
+    ];
+
+    if (ingredientIds.length === 0) {
+      setRecipesPreFilled(true);
+      return;
+    }
+
+    apiClient<{ results: Record<number, IngredientRecipeItem[]> }>(
+      '/api/ingredients/recipes-batch',
+      { method: 'POST', body: { ingredient_ids: ingredientIds } },
+    )
+      .then((data) => {
+        setLines((prev) =>
+          prev.map((line) => {
+            if (!line.ingredient_id || line.recipe_links.length > 0) return line;
+            const recipes = data.results[line.ingredient_id] || [];
+            if (recipes.length > 0) {
+              return {
+                ...line,
+                recipe_links: recipes.map((r) => ({
+                  recipe_id: r.recipe_id,
+                  recipe_name: r.recipe_name,
+                  quantity: r.quantity,
+                  unit: r.unit,
+                  is_new: false,
+                })),
+              };
+            }
+
+            // Fallback: match by name similarity
+            const ingName =
+              allIngredients
+                .find((i) => i.id === line.ingredient_id)
+                ?.name?.toLowerCase() ?? '';
+            if (!ingName) return line;
+
+            const stopWords = new Set([
+              'de', 'le', 'la', 'les', 'du', 'des', 'un', 'une',
+              'biere', 'bière', 'vin', 'eau',
+            ]);
+            const ingWords = ingName
+              .split(/[\s-]+/)
+              .filter((w) => w.length > 2 && !stopWords.has(w));
+            if (ingWords.length === 0) return line;
+
+            const matches = recipesList.filter((r) => {
+              const rWords = r.name.toLowerCase().split(/[\s-]+/);
+              return ingWords.some((w) =>
+                rWords.some((rw) => rw.includes(w) || w.includes(rw)),
+              );
+            });
+
+            if (matches.length > 0 && matches.length <= 5) {
+              return {
+                ...line,
+                recipe_links: matches.map((r) => ({
+                  recipe_id: r.id,
+                  recipe_name: r.name,
+                  quantity: 1,
+                  unit: 'piece',
+                  is_new: false,
+                })),
+              };
+            }
+            return line;
+          }),
+        );
+        setRecipesPreFilled(true);
+      })
+      .catch(() => {
+        setRecipesPreFilled(true);
+      });
+  }, [initialized, recipesPreFilled, lines.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handlePatchField = (field: 'supplier_name' | 'invoice_date', value: string) => {
     if (!value.trim()) return;
     const current = field === 'supplier_name' ? invoice?.supplier_name : invoice?.invoice_date;
@@ -765,12 +856,6 @@ export default function InvoiceReview() {
       },
     );
   };
-
-  const allIngredients: IngredientItem[] = (ingredientsData?.items ?? []).map(
-    (i: { id: number; name: string }) => ({ id: i.id, name: i.name }),
-  );
-
-  const recipesList = (recipesData?.items ?? []).map((r) => ({ id: r.id, name: r.name }));
 
   const updateLine = (index: number, updates: Partial<LineState>) => {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...updates } : l)));

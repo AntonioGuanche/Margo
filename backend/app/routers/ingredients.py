@@ -13,6 +13,8 @@ from app.models.price_history import IngredientPriceHistory
 from app.models.recipe import Recipe, RecipeIngredient
 from app.models.restaurant import Restaurant
 from app.schemas.ingredient import (
+    BatchRecipesRequest,
+    BatchRecipesResponse,
     IngredientCreate,
     IngredientListResponse,
     IngredientRecipeItem,
@@ -66,6 +68,49 @@ async def list_ingredients(
         items=[IngredientResponse.model_validate(item) for item in items],
         total=total,
     )
+
+
+@router.post("/recipes-batch", response_model=BatchRecipesResponse)
+async def get_recipes_batch(
+    body: BatchRecipesRequest,
+    restaurant: Restaurant = Depends(get_current_restaurant),
+    db: AsyncSession = Depends(get_db),
+) -> BatchRecipesResponse:
+    """Get recipes for multiple ingredients at once (for invoice review)."""
+    if not body.ingredient_ids:
+        return BatchRecipesResponse(results={})
+
+    rows = await db.execute(
+        select(
+            RecipeIngredient.ingredient_id,
+            Recipe.id,
+            Recipe.name,
+            Recipe.category,
+            RecipeIngredient.quantity,
+            RecipeIngredient.unit,
+        )
+        .join(Recipe, Recipe.id == RecipeIngredient.recipe_id)
+        .where(
+            RecipeIngredient.ingredient_id.in_(body.ingredient_ids),
+            Recipe.restaurant_id == restaurant.id,
+        )
+    )
+
+    results: dict[int, list[IngredientRecipeItem]] = {
+        iid: [] for iid in body.ingredient_ids
+    }
+    for row in rows.all():
+        results[row.ingredient_id].append(
+            IngredientRecipeItem(
+                recipe_id=row.id,
+                recipe_name=row.name,
+                category=row.category,
+                quantity=row.quantity,
+                unit=row.unit,
+            )
+        )
+
+    return BatchRecipesResponse(results=results)
 
 
 @router.get("/{ingredient_id}", response_model=IngredientResponse)

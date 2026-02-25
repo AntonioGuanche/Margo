@@ -339,3 +339,58 @@ async def test_get_ingredient_recipes_empty(
     )
     assert resp.status_code == 200
     assert len(resp.json()["items"]) == 0
+
+
+# --- BATCH RECIPES ---
+
+
+async def test_recipes_batch(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    db_session: AsyncSession,
+    restaurant: Restaurant,
+) -> None:
+    """POST /api/ingredients/recipes-batch returns recipes grouped by ingredient."""
+    # Create 2 ingredients
+    ing1 = Ingredient(restaurant_id=restaurant.id, name="Boeuf", unit="kg", current_price=12.0)
+    ing2 = Ingredient(restaurant_id=restaurant.id, name="Poulet", unit="kg", current_price=8.0)
+    db_session.add_all([ing1, ing2])
+    await db_session.flush()
+    await db_session.refresh(ing1)
+    await db_session.refresh(ing2)
+
+    # Create recipe linked to ing1 only
+    recipe = Recipe(restaurant_id=restaurant.id, name="Steak Frites", selling_price=18.0)
+    db_session.add(recipe)
+    await db_session.flush()
+    await db_session.refresh(recipe)
+
+    ri = RecipeIngredient(recipe_id=recipe.id, ingredient_id=ing1.id, quantity=0.2, unit="kg")
+    db_session.add(ri)
+    await db_session.flush()
+
+    resp = await client.post(
+        "/api/ingredients/recipes-batch",
+        json={"ingredient_ids": [ing1.id, ing2.id]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    # ing1 has 1 recipe, ing2 has 0
+    assert len(data["results"][str(ing1.id)]) == 1
+    assert data["results"][str(ing1.id)][0]["recipe_name"] == "Steak Frites"
+    assert len(data["results"][str(ing2.id)]) == 0
+
+
+async def test_recipes_batch_empty(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+) -> None:
+    """POST /api/ingredients/recipes-batch with empty list returns empty."""
+    resp = await client.post(
+        "/api/ingredients/recipes-batch",
+        json={"ingredient_ids": []},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["results"] == {}

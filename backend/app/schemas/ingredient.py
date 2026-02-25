@@ -72,3 +72,13 @@ class IngredientRecipeItem(BaseModel):
 
 class IngredientRecipesResponse(BaseModel):
     items: list[IngredientRecipeItem]
+
+
+# --- Batch recipes ---
+
+class BatchRecipesRequest(BaseModel):
+    ingredient_ids: list[int]
+
+
+class BatchRecipesResponse(BaseModel):
+    results: dict[int, list[IngredientRecipeItem]]
