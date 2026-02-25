@@ -59,7 +59,7 @@ margo/
 │   └── pyproject.toml
 ├── frontend/
 │   ├── src/
-│   │   ├── components/        # Reusable UI (Skeleton, UpgradeModal, ConfirmModal, Layout, Nav)
+│   │   ├── components/        # Reusable UI (Skeleton, UpgradeModal, ConfirmModal, Layout, Nav, MenuUploadZone)
 │   │   ├── pages/
 │   │   │   ├── Recipes.tsx    # "Ma carte" — inline upload zone + drag&drop + manual add + delete individual/all
 │   │   │   ├── RecipeDetail.tsx
@@ -122,11 +122,12 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - When an ingredient price changes → recalculate ALL recipes using that ingredient
 - Margin thresholds: 🟢 <30% food cost, 🟠 30-35%, 🔴 >35% (configurable per restaurant)
 - Invoice matching: exact name → fuzzy (pg_trgm trigram) → suggest new ingredient
+- **Multi-recipe per invoice line:** each line can be linked to multiple recipes via `recipe_links` array (RecipeLinkRequest schema). Backend has backward compat with legacy single-recipe fields.
 - After user confirms a match, store it as IngredientAlias for future auto-matching
 - **Invoice portions:** unit_parser.py parses Belgian packaging patterns (24/3, CASIER 24, 6x25cl), calculates volume-based portions for beer/wine/spirit with interactive serving size
 - **Onboarding:** photo/PDF of menu → AI extracts dishes (with cocktail category) → AI suggests ingredients (homemade only) → purchased items auto-get ingredient = product name (qty 1, unit piece) → batch creation
 - **Cocktail detection:** `is_cocktail()` in utils.py + `isCocktail()` in Onboarding.tsx detect cocktails by name/keywords → marked homemade (has sub-ingredients). Non-cocktail boissons → purchased.
-- **Plan limits:** free = 200 recipes (temporarily raised from 5), 3 invoices/month. Pro/Multi = unlimited.
+- **Plan limits:** free = unlimited (temporarily, revert to 5 recipes / 3 invoices/month after field testing). Pro/Multi = unlimited.
 
 ## Important patterns
 
@@ -135,6 +136,8 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - **`unit_parser.py`** fallback: if OCR doesn't extract `units_per_package`, regex parses it from description (4-48 range sanity check)
 - **Onboarding navigate state:** Recipes.tsx → `/onboarding` with `{ dishes, skipExtract }` (pre-extracted) or `{ file }` (auto-extract)
 - **Delete recipes:** Individual delete via Trash2 hover button + ConfirmModal. "Supprimer tout le menu" with SUPPRIMER text confirmation. Backend DELETE /all route placed before /{recipe_id} to avoid path collision.
+- **Delete invoices:** Trash2 hover button on non-confirmed invoices in Invoices.tsx + ConfirmModal. Backend DELETE /{invoice_id} rejects confirmed invoices.
+- **MenuUploadZone:** Shared component (components/MenuUploadZone.tsx) used in Dashboard empty state and Recipes page. Supports drag&drop, multi-file sequential extraction with progress, camera, optional manual add button.
 - **€ symbol:** Price input in StepDishes uses absolute-positioned € suffix (not in placeholder)
 
 ## IMPORTANT rules
@@ -159,4 +162,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 22 — Upload zone shown by default when menu is empty (no more empty state screen). See @PLAN.md for original roadmap.
+Sprint 23 — Shared MenuUploadZone component, multi-recipe invoice lines, delete invoice from list, unlimited free plan. See @PLAN.md for original roadmap.

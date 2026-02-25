@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Clock, CheckCircle, Upload } from 'lucide-react';
-import { useInvoices } from '../hooks/useInvoices';
+import { FileText, Plus, Clock, CheckCircle, Upload, Trash2 } from 'lucide-react';
+import { useInvoices, useDeleteInvoice } from '../hooks/useInvoices';
 import { SkeletonList } from '../components/Skeleton';
+import ConfirmModal from '../components/ConfirmModal';
 import type { InvoiceListItem } from '../hooks/useInvoices';
 
 function StatusBadge({ status }: { status: string }) {
@@ -47,17 +49,17 @@ function FormatBadge({ format }: { format: string }) {
   );
 }
 
-function InvoiceRow({ invoice, onClick }: { invoice: InvoiceListItem; onClick: () => void }) {
+function InvoiceRow({ invoice, onClick, onDelete }: { invoice: InvoiceListItem; onClick: () => void; onDelete: () => void }) {
   const date = invoice.invoice_date
     ? new Date(invoice.invoice_date).toLocaleDateString('fr-BE')
     : '—';
 
   return (
-    <button
-      onClick={onClick}
-      className="w-full bg-white rounded-xl border border-stone-200 px-4 py-3 flex items-center justify-between hover:border-stone-300 transition-colors text-left"
-    >
-      <div className="min-w-0 flex-1">
+    <div className="w-full bg-white rounded-xl border border-stone-200 px-4 py-3 flex items-center justify-between group">
+      <button
+        onClick={onClick}
+        className="min-w-0 flex-1 text-left hover:opacity-80 transition-opacity"
+      >
         <div className="font-medium text-stone-900 truncate">
           {invoice.supplier_name ?? 'Fournisseur inconnu'}
         </div>
@@ -68,7 +70,7 @@ function InvoiceRow({ invoice, onClick }: { invoice: InvoiceListItem; onClick: (
           <SourceBadge source={invoice.source} />
           <FormatBadge format={invoice.format} />
         </div>
-      </div>
+      </button>
       <div className="flex items-center gap-3 ml-2 shrink-0">
         {invoice.total_amount != null && (
           <span className="text-sm font-semibold text-stone-700">
@@ -76,14 +78,25 @@ function InvoiceRow({ invoice, onClick }: { invoice: InvoiceListItem; onClick: (
           </span>
         )}
         <StatusBadge status={invoice.status} />
+        {invoice.status !== 'confirmed' && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="p-1.5 text-stone-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all"
+            title="Supprimer"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
-    </button>
+    </div>
   );
 }
 
 export default function Invoices() {
   const navigate = useNavigate();
   const { data, isLoading } = useInvoices();
+  const deleteMutation = useDeleteInvoice();
+  const [deleting, setDeleting] = useState<InvoiceListItem | null>(null);
 
   if (isLoading) {
     return (
@@ -135,16 +148,26 @@ export default function Invoices() {
             <InvoiceRow
               key={invoice.id}
               invoice={invoice}
-              onClick={() =>
-                navigate(
-                  invoice.status === 'pending_review'
-                    ? `/invoices/${invoice.id}/review`
-                    : `/invoices/${invoice.id}/review`,
-                )
-              }
+              onClick={() => navigate(`/invoices/${invoice.id}/review`)}
+              onDelete={() => setDeleting(invoice)}
             />
           ))}
         </div>
+      )}
+
+      {/* Modal suppression facture */}
+      {deleting && (
+        <ConfirmModal
+          title={`Supprimer la facture ?`}
+          message={`La facture de ${deleting.supplier_name ?? 'fournisseur inconnu'} sera supprimée. Cette action est irréversible.`}
+          onConfirm={() => {
+            deleteMutation.mutate(deleting.id, {
+              onSuccess: () => setDeleting(null),
+            });
+          }}
+          onCancel={() => setDeleting(null)}
+          isLoading={deleteMutation.isPending}
+        />
       )}
     </div>
   );

@@ -40,6 +40,13 @@ interface LineState {
   match_confidence: string;
   suggestions: { id: number; name: string; score: number }[];
   is_manual: boolean;
+  recipe_links: RecipeLink[];
+}
+
+const UNIT_OPTIONS = ['g', 'kg', 'cl', 'l', 'pce'];
+const RECIPE_CATEGORIES = ['entrée', 'plat', 'dessert', 'boisson', 'autre'];
+
+interface RecipeLink {
   add_to_recipe_id: number | null;
   recipe_quantity: number | null;
   recipe_unit: string | null;
@@ -49,8 +56,17 @@ interface LineState {
   create_recipe_is_homemade: boolean;
 }
 
-const UNIT_OPTIONS = ['g', 'kg', 'cl', 'l', 'pce'];
-const RECIPE_CATEGORIES = ['entrée', 'plat', 'dessert', 'boisson', 'autre'];
+function emptyRecipeLink(): RecipeLink {
+  return {
+    add_to_recipe_id: null,
+    recipe_quantity: null,
+    recipe_unit: null,
+    create_recipe_name: null,
+    create_recipe_price: null,
+    create_recipe_category: null,
+    create_recipe_is_homemade: false,
+  };
+}
 
 function ConfidenceBadge({ confidence }: { confidence: string }) {
   const styles = {
@@ -90,8 +106,6 @@ function LineRow({
 }) {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
-  const [showRecipeLink, setShowRecipeLink] = useState(line.add_to_recipe_id != null);
-
   const handleSelectIngredient = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     if (value === '__create__') {
@@ -286,6 +300,16 @@ function LineRow({
           >
             <option value="">Choisir un ingrédient...</option>
 
+            {/* Selected ingredient — always visible first if not in suggestions */}
+            {matchedId && !suggestionIds.has(matchedId) && (() => {
+              const matched = allIngredients.find(i => i.id === matchedId);
+              return matched ? (
+                <option key={matched.id} value={matched.id}>
+                  {matched.name}
+                </option>
+              ) : null;
+            })()}
+
             {/* Suggestions from matching */}
             {line.suggestions.length > 0 && (
               <optgroup label="Suggestions">
@@ -340,167 +364,182 @@ function LineRow({
             </div>
           )}
 
-          {/* Add to recipe / create recipe */}
-          <>
-            {!showRecipeLink ? (
-              <button
-                onClick={() => {
-                  setShowRecipeLink(true);
-                  // Auto-create ingredient if none selected yet
-                  if (!line.ingredient_id && !line.create_ingredient_name) {
-                    setShowCreate(true);
-                    setNewName(line.description);
-                    onChange({ create_ingredient_name: line.description });
-                  }
-                }}
-                className="text-xs text-stone-500 hover:text-blue-600 flex items-center gap-1 mt-1"
-              >
-                  <Link2 size={12} />
-                  Ajouter à une recette
+          {/* Recipe links — multi-recipe support */}
+          {line.recipe_links.map((rl, rlIdx) => (
+            <div key={rlIdx} className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-blue-700">
+                  Recette{line.recipe_links.length > 1 ? ` #${rlIdx + 1}` : ''}
+                </span>
+                <button
+                  onClick={() => {
+                    onChange({ recipe_links: line.recipe_links.filter((_, i) => i !== rlIdx) });
+                  }}
+                  className="p-0.5 text-blue-400 hover:text-blue-600"
+                >
+                  <X size={14} />
                 </button>
-              ) : (
-                <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-blue-700">
-                      Ajouter à une recette
-                    </span>
-                    <button
-                      onClick={() => {
-                        setShowRecipeLink(false);
-                        onChange({
-                          add_to_recipe_id: null,
-                          recipe_quantity: null,
-                          recipe_unit: null,
-                          create_recipe_name: null,
-                          create_recipe_price: null,
-                          create_recipe_category: null,
-                          create_recipe_is_homemade: false,
-                        });
-                      }}
-                      className="p-0.5 text-blue-400 hover:text-blue-600"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
+              </div>
 
-                  <select
-                    value={
-                      line.create_recipe_name != null
-                        ? '__create__'
-                        : line.add_to_recipe_id?.toString() ?? ''
-                    }
+              <select
+                value={
+                  rl.create_recipe_name != null
+                    ? '__create__'
+                    : rl.add_to_recipe_id?.toString() ?? ''
+                }
+                onChange={(e) => {
+                  const newLinks = [...line.recipe_links];
+                  if (e.target.value === '__create__') {
+                    newLinks[rlIdx] = {
+                      ...newLinks[rlIdx],
+                      add_to_recipe_id: null,
+                      create_recipe_name: line.description,
+                      create_recipe_price: null,
+                      create_recipe_category: 'boisson',
+                      create_recipe_is_homemade: false,
+                    };
+                  } else {
+                    newLinks[rlIdx] = {
+                      ...newLinks[rlIdx],
+                      add_to_recipe_id: e.target.value ? parseInt(e.target.value, 10) : null,
+                      create_recipe_name: null,
+                      create_recipe_price: null,
+                      create_recipe_category: null,
+                      create_recipe_is_homemade: false,
+                    };
+                  }
+                  onChange({ recipe_links: newLinks });
+                }}
+                className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Choisir une recette...</option>
+                <option value="__create__">+ Créer un nouveau produit</option>
+                {recipesList.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+
+              {/* Create new recipe form */}
+              {rl.create_recipe_name != null && (
+                <div className="space-y-2 p-2 bg-white rounded-lg border border-blue-200">
+                  <input
+                    type="text"
+                    value={rl.create_recipe_name}
                     onChange={(e) => {
-                      if (e.target.value === '__create__') {
-                        onChange({
-                          add_to_recipe_id: null,
-                          create_recipe_name: line.description,
-                          create_recipe_price: null,
-                          create_recipe_category: 'boisson',
-                          create_recipe_is_homemade: false,
-                        });
-                      } else {
-                        onChange({
-                          add_to_recipe_id: e.target.value ? parseInt(e.target.value, 10) : null,
-                          create_recipe_name: null,
-                          create_recipe_price: null,
-                          create_recipe_category: null,
-                          create_recipe_is_homemade: false,
-                        });
-                      }
+                      const newLinks = [...line.recipe_links];
+                      newLinks[rlIdx] = { ...newLinks[rlIdx], create_recipe_name: e.target.value };
+                      onChange({ recipe_links: newLinks });
                     }}
-                    className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nom du produit"
+                    className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={rl.create_recipe_price ?? ''}
+                      onChange={(e) => {
+                        const newLinks = [...line.recipe_links];
+                        newLinks[rlIdx] = {
+                          ...newLinks[rlIdx],
+                          create_recipe_price: e.target.value ? parseFloat(e.target.value) : null,
+                        };
+                        onChange({ recipe_links: newLinks });
+                      }}
+                      placeholder="Prix de vente (€)"
+                      step="0.50"
+                      className="flex-1 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <select
+                      value={rl.create_recipe_category ?? 'boisson'}
+                      onChange={(e) => {
+                        const newLinks = [...line.recipe_links];
+                        newLinks[rlIdx] = { ...newLinks[rlIdx], create_recipe_category: e.target.value };
+                        onChange({ recipe_links: newLinks });
+                      }}
+                      className="w-28 border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {RECIPE_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c.charAt(0).toUpperCase() + c.slice(1)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-stone-600">
+                    <input
+                      type="checkbox"
+                      checked={rl.create_recipe_is_homemade}
+                      onChange={(e) => {
+                        const newLinks = [...line.recipe_links];
+                        newLinks[rlIdx] = { ...newLinks[rlIdx], create_recipe_is_homemade: e.target.checked };
+                        onChange({ recipe_links: newLinks });
+                      }}
+                      className="rounded border-stone-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    Plat maison
+                  </label>
+                </div>
+              )}
+
+              {/* Quantity & unit for recipe association */}
+              {(rl.add_to_recipe_id || rl.create_recipe_name) && (
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={rl.recipe_quantity ?? ''}
+                    onChange={(e) => {
+                      const newLinks = [...line.recipe_links];
+                      newLinks[rlIdx] = {
+                        ...newLinks[rlIdx],
+                        recipe_quantity: e.target.value ? parseFloat(e.target.value) : null,
+                      };
+                      onChange({ recipe_links: newLinks });
+                    }}
+                    placeholder="Quantité par portion"
+                    step="0.1"
+                    className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <select
+                    value={rl.recipe_unit ?? 'g'}
+                    onChange={(e) => {
+                      const newLinks = [...line.recipe_links];
+                      newLinks[rlIdx] = { ...newLinks[rlIdx], recipe_unit: e.target.value };
+                      onChange({ recipe_links: newLinks });
+                    }}
+                    className="w-24 border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Choisir une recette...</option>
-                    <option value="__create__">+ Créer un nouveau produit</option>
-                    {recipesList.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
+                    {UNIT_OPTIONS.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
                       </option>
                     ))}
                   </select>
-
-                  {/* Create new recipe form */}
-                  {line.create_recipe_name != null && (
-                    <div className="space-y-2 p-2 bg-white rounded-lg border border-blue-200">
-                      <input
-                        type="text"
-                        value={line.create_recipe_name}
-                        onChange={(e) => onChange({ create_recipe_name: e.target.value })}
-                        placeholder="Nom du produit"
-                        className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          value={line.create_recipe_price ?? ''}
-                          onChange={(e) =>
-                            onChange({
-                              create_recipe_price: e.target.value
-                                ? parseFloat(e.target.value)
-                                : null,
-                            })
-                          }
-                          placeholder="Prix de vente (€)"
-                          step="0.50"
-                          className="flex-1 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <select
-                          value={line.create_recipe_category ?? 'boisson'}
-                          onChange={(e) => onChange({ create_recipe_category: e.target.value })}
-                          className="w-28 border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          {RECIPE_CATEGORIES.map((c) => (
-                            <option key={c} value={c}>
-                              {c.charAt(0).toUpperCase() + c.slice(1)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <label className="flex items-center gap-2 text-sm text-stone-600">
-                        <input
-                          type="checkbox"
-                          checked={line.create_recipe_is_homemade}
-                          onChange={(e) =>
-                            onChange({ create_recipe_is_homemade: e.target.checked })
-                          }
-                          className="rounded border-stone-300 text-orange-600 focus:ring-orange-500"
-                        />
-                        Plat maison
-                      </label>
-                    </div>
-                  )}
-
-                  {/* Quantity & unit for recipe association */}
-                  {(line.add_to_recipe_id || line.create_recipe_name) && (
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        value={line.recipe_quantity ?? ''}
-                        onChange={(e) =>
-                          onChange({
-                            recipe_quantity: e.target.value ? parseFloat(e.target.value) : null,
-                          })
-                        }
-                        placeholder="Quantité par portion"
-                        step="0.1"
-                        className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <select
-                        value={line.recipe_unit ?? 'g'}
-                        onChange={(e) => onChange({ recipe_unit: e.target.value })}
-                        className="w-24 border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {UNIT_OPTIONS.map((u) => (
-                          <option key={u} value={u}>
-                            {u}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
                 </div>
               )}
-          </>
+            </div>
+          ))}
+
+          <button
+            onClick={() => {
+              // Auto-create ingredient if none selected yet
+              if (!line.ingredient_id && !line.create_ingredient_name) {
+                setShowCreate(true);
+                setNewName(line.description);
+                onChange({
+                  create_ingredient_name: line.description,
+                  recipe_links: [...line.recipe_links, emptyRecipeLink()],
+                });
+              } else {
+                onChange({ recipe_links: [...line.recipe_links, emptyRecipeLink()] });
+              }
+            }}
+            className="text-xs text-stone-500 hover:text-blue-600 flex items-center gap-1 mt-1"
+          >
+            <Link2 size={12} />
+            Ajouter à une recette
+          </button>
         </div>
       )}
     </div>
@@ -544,13 +583,7 @@ export default function InvoiceReview() {
         match_confidence: l.match_confidence,
         suggestions: l.suggestions,
         is_manual: false,
-        add_to_recipe_id: null,
-        recipe_quantity: null,
-        recipe_unit: null,
-        create_recipe_name: null,
-        create_recipe_price: null,
-        create_recipe_category: null,
-        create_recipe_is_homemade: false,
+        recipe_links: [],
       })),
     );
     setEditSupplier(invoice.supplier_name ?? '');
@@ -605,13 +638,7 @@ export default function InvoiceReview() {
         match_confidence: 'manual',
         suggestions: [],
         is_manual: true,
-        add_to_recipe_id: null,
-        recipe_quantity: null,
-        recipe_unit: null,
-        create_recipe_name: null,
-        create_recipe_price: null,
-        create_recipe_category: null,
-        create_recipe_is_homemade: false,
+        recipe_links: [],
       },
     ]);
   }, []);
@@ -633,13 +660,17 @@ export default function InvoiceReview() {
         create_ingredient_name: l.create_ingredient_name,
         unit_price: l.unit_price,
         unit: l.unit,
-        add_to_recipe_id: l.add_to_recipe_id ?? undefined,
-        recipe_quantity: l.recipe_quantity ?? undefined,
-        recipe_unit: l.recipe_unit ?? undefined,
-        create_recipe_name: l.create_recipe_name ?? undefined,
-        create_recipe_price: l.create_recipe_price ?? undefined,
-        create_recipe_category: l.create_recipe_category ?? undefined,
-        create_recipe_is_homemade: l.create_recipe_name ? l.create_recipe_is_homemade : undefined,
+        recipe_links: l.recipe_links
+          .filter((rl) => rl.add_to_recipe_id || rl.create_recipe_name)
+          .map((rl) => ({
+            add_to_recipe_id: rl.add_to_recipe_id ?? undefined,
+            recipe_quantity: rl.recipe_quantity ?? undefined,
+            recipe_unit: rl.recipe_unit ?? undefined,
+            create_recipe_name: rl.create_recipe_name ?? undefined,
+            create_recipe_price: rl.create_recipe_price ?? undefined,
+            create_recipe_category: rl.create_recipe_category ?? undefined,
+            create_recipe_is_homemade: rl.create_recipe_name ? rl.create_recipe_is_homemade : undefined,
+          })),
       }));
 
     confirm.mutate(confirmLines, {

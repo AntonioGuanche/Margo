@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ChefHat, TrendingUp, Camera, FileDown, AlertTriangle, SlidersHorizontal } from 'lucide-react';
+import { LayoutDashboard, ChefHat, TrendingUp, FileDown, AlertTriangle, SlidersHorizontal } from 'lucide-react';
 import { useDashboard } from '../hooks/useRecipes';
 import { useAlertCount, useAlerts } from '../hooks/useAlerts';
 import { SkeletonDashboard } from '../components/Skeleton';
+import MenuUploadZone from '../components/MenuUploadZone';
 import type { RecipeListItem } from '../hooks/useRecipes';
 
 const STATUS_COLORS = {
@@ -77,25 +78,17 @@ export default function Dashboard() {
           <LayoutDashboard size={22} className="text-orange-700" />
           Dashboard
         </h2>
-        <div className="bg-white rounded-xl border border-stone-200 p-8 text-center">
-          <ChefHat size={48} className="mx-auto text-stone-300 mb-4" />
-          <p className="text-stone-500 mb-4">
+        <div className="mb-2">
+          <ChefHat size={40} className="mx-auto text-stone-300 mb-2" />
+          <p className="text-stone-500 text-center mb-4">
             Ajoute ta première recette pour voir ton food cost
           </p>
-          <button
-            onClick={() => navigate('/onboarding')}
-            className="w-full bg-orange-700 text-white px-4 py-4 rounded-xl text-lg font-medium hover:bg-orange-800 transition-colors flex items-center justify-center gap-2 mb-3"
-          >
-            <Camera size={24} />
-            Commencer — Photographier ma carte
-          </button>
-          <button
-            onClick={() => navigate('/recipes/new')}
-            className="text-sm text-orange-700 hover:underline"
-          >
-            Ou créer une recette manuellement
-          </button>
         </div>
+        <MenuUploadZone
+          onExtracted={(dishes) =>
+            navigate('/onboarding', { state: { dishes, skipExtract: true } })
+          }
+        />
       </div>
     );
   }

@@ -49,21 +49,33 @@ class InvoiceUploadResponse(BaseModel):
 
 # --- Confirmation ---
 
+class RecipeLinkRequest(BaseModel):
+    """A single recipe association for an invoice line."""
+    add_to_recipe_id: int | None = None
+    recipe_quantity: float | None = None
+    recipe_unit: str | None = None
+    create_recipe_name: str | None = None
+    create_recipe_price: float | None = None
+    create_recipe_category: str | None = None
+    create_recipe_is_homemade: bool = False
+
+
 class InvoiceConfirmLine(BaseModel):
     description: str
     ingredient_id: int | None = None  # null = ignore this line
     create_ingredient_name: str | None = None  # if new, create with this name
     unit_price: float | None = None
     unit: str | None = None
-    # Optional: associate this ingredient with an existing recipe
+    # Legacy single-recipe fields (kept for backward compatibility)
     add_to_recipe_id: int | None = None
     recipe_quantity: float | None = None
     recipe_unit: str | None = None
-    # Optional: create a new recipe/product from this line
     create_recipe_name: str | None = None
     create_recipe_price: float | None = None
     create_recipe_category: str | None = None
     create_recipe_is_homemade: bool = False
+    # Multi-recipe: overrides legacy fields when non-empty
+    recipe_links: list[RecipeLinkRequest] = []
 
 
 class InvoiceConfirmRequest(BaseModel):

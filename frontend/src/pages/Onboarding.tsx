@@ -227,6 +227,10 @@ function StepDishes({
     ]);
   }
 
+  function removeDish(index: number) {
+    setEditableDishes((prev) => prev.filter((_, i) => i !== index));
+  }
+
   function duplicateDish(index: number) {
     setEditableDishes((prev) => {
       const source = prev[index];
@@ -285,13 +289,22 @@ function StepDishes({
                 className="flex-1 border border-stone-300 rounded-lg px-2 py-1.5 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
                 placeholder="Nom du plat"
               />
-              <button
-                onClick={() => duplicateDish(index)}
-                className="p-1 text-stone-400 hover:text-orange-700 transition-colors"
-                title="Dupliquer ce plat"
-              >
-                <CopyPlus size={16} />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => duplicateDish(index)}
+                  className="p-1 text-stone-400 hover:text-orange-700 transition-colors"
+                  title="Dupliquer"
+                >
+                  <CopyPlus size={16} />
+                </button>
+                <button
+                  onClick={() => removeDish(index)}
+                  className="p-1 text-stone-400 hover:text-red-600 transition-colors"
+                  title="Supprimer"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
             <div className="flex gap-2 ml-6">
               <div className="relative w-24">

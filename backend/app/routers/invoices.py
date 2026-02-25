@@ -27,6 +27,7 @@ from app.schemas.invoice import (
     InvoiceListResponse,
     InvoicePatchRequest,
     InvoiceUploadResponse,
+    RecipeLinkRequest,
 )
 from app.services.alerts import check_and_create_alerts
 from app.services.costing import recalculate_recipes_for_ingredient
@@ -401,53 +402,68 @@ async def confirm_invoice(
                     await save_alias(db, restaurant.id, line.description, ingredient_id)
                     aliases_saved += 1
 
-        # Associate ingredient with a recipe if requested
-        if line.add_to_recipe_id and ingredient_id and line.recipe_quantity:
-            recipe_result = await db.execute(
-                select(Recipe).where(
-                    Recipe.id == line.add_to_recipe_id,
-                    Recipe.restaurant_id == restaurant.id,
-                )
-            )
-            recipe = recipe_result.scalar_one_or_none()
-            if recipe:
-                existing_ri = await db.execute(
-                    select(RecipeIngredient).where(
-                        RecipeIngredient.recipe_id == recipe.id,
-                        RecipeIngredient.ingredient_id == ingredient_id,
+        # Build the list of recipe links (multi-recipe support)
+        links = list(line.recipe_links) if line.recipe_links else []
+        # Backward compat: if no recipe_links, build from legacy single fields
+        if not links and (line.add_to_recipe_id or line.create_recipe_name):
+            links = [RecipeLinkRequest(
+                add_to_recipe_id=line.add_to_recipe_id,
+                recipe_quantity=line.recipe_quantity,
+                recipe_unit=line.recipe_unit,
+                create_recipe_name=line.create_recipe_name,
+                create_recipe_price=line.create_recipe_price,
+                create_recipe_category=line.create_recipe_category,
+                create_recipe_is_homemade=line.create_recipe_is_homemade,
+            )]
+
+        for rl in links:
+            # Associate ingredient with an existing recipe
+            if rl.add_to_recipe_id and ingredient_id and rl.recipe_quantity:
+                recipe_result = await db.execute(
+                    select(Recipe).where(
+                        Recipe.id == rl.add_to_recipe_id,
+                        Recipe.restaurant_id == restaurant.id,
                     )
                 )
-                if not existing_ri.scalar_one_or_none():
-                    ri = RecipeIngredient(
-                        recipe_id=recipe.id,
-                        ingredient_id=ingredient_id,
-                        quantity=line.recipe_quantity,
-                        unit=line.recipe_unit or "g",
+                recipe = recipe_result.scalar_one_or_none()
+                if recipe:
+                    existing_ri = await db.execute(
+                        select(RecipeIngredient).where(
+                            RecipeIngredient.recipe_id == recipe.id,
+                            RecipeIngredient.ingredient_id == ingredient_id,
+                        )
                     )
-                    db.add(ri)
-                    affected_ingredient_ids.add(ingredient_id)
+                    if not existing_ri.scalar_one_or_none():
+                        ri = RecipeIngredient(
+                            recipe_id=recipe.id,
+                            ingredient_id=ingredient_id,
+                            quantity=rl.recipe_quantity,
+                            unit=rl.recipe_unit or "g",
+                        )
+                        db.add(ri)
+                        affected_ingredient_ids.add(ingredient_id)
 
-        # Create a new recipe/product if requested
-        if line.create_recipe_name and ingredient_id:
-            new_recipe = Recipe(
-                restaurant_id=restaurant.id,
-                name=line.create_recipe_name,
-                selling_price=line.create_recipe_price or 0,
-                category=line.create_recipe_category,
-                is_homemade=line.create_recipe_is_homemade,
-            )
-            db.add(new_recipe)
-            await db.flush()
+            # Create a new recipe/product if requested
+            if rl.create_recipe_name and ingredient_id:
+                new_recipe = Recipe(
+                    restaurant_id=restaurant.id,
+                    name=rl.create_recipe_name,
+                    selling_price=rl.create_recipe_price or 0,
+                    category=rl.create_recipe_category,
+                    is_homemade=rl.create_recipe_is_homemade,
+                )
+                db.add(new_recipe)
+                await db.flush()
 
-            ri = RecipeIngredient(
-                recipe_id=new_recipe.id,
-                ingredient_id=ingredient_id,
-                quantity=line.recipe_quantity or 1,
-                unit=line.recipe_unit or "pce",
-            )
-            db.add(ri)
-            affected_ingredient_ids.add(ingredient_id)
-            recipes_created += 1
+                ri = RecipeIngredient(
+                    recipe_id=new_recipe.id,
+                    ingredient_id=ingredient_id,
+                    quantity=rl.recipe_quantity or 1,
+                    unit=rl.recipe_unit or "pce",
+                )
+                db.add(ri)
+                affected_ingredient_ids.add(ingredient_id)
+                recipes_created += 1
 
     # Cascade recalculate all affected recipes
     recipes_recalculated = 0

@@ -71,12 +71,7 @@ export interface InvoiceDetailResponse {
   created_at: string;
 }
 
-interface InvoiceConfirmLine {
-  description: string;
-  ingredient_id: number | null;
-  create_ingredient_name: string | null;
-  unit_price: number | null;
-  unit: string | null;
+interface RecipeLinkRequest {
   add_to_recipe_id?: number;
   recipe_quantity?: number;
   recipe_unit?: string;
@@ -84,6 +79,15 @@ interface InvoiceConfirmLine {
   create_recipe_price?: number;
   create_recipe_category?: string;
   create_recipe_is_homemade?: boolean;
+}
+
+interface InvoiceConfirmLine {
+  description: string;
+  ingredient_id: number | null;
+  create_ingredient_name: string | null;
+  unit_price: number | null;
+  unit: string | null;
+  recipe_links?: RecipeLinkRequest[];
 }
 
 interface InvoiceConfirmResponse {

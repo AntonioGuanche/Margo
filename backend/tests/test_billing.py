@@ -56,8 +56,8 @@ async def test_get_plan_free(client: AsyncClient, auth_headers: dict, restaurant
     assert resp.status_code == 200
     data = resp.json()
     assert data["current_plan"] == "free"
-    assert data["max_recipes"] == 200  # temporarily raised for field testing
-    assert data["max_invoices_per_month"] == 3
+    assert data["max_recipes"] is None  # unlimited during field testing
+    assert data["max_invoices_per_month"] is None  # unlimited during field testing
     assert data["current_recipes"] == 0
     assert data["current_invoices_this_month"] == 0
     assert data["can_manage_billing"] is False
@@ -92,12 +92,13 @@ async def test_recipe_limit_free(
     assert "Limite" in resp.json()["detail"]
 
 
+@patch("app.services.billing.PLAN_LIMITS", {"free": {"max_recipes": 5, "max_invoices_per_month": 3}, "pro": {"max_recipes": None, "max_invoices_per_month": None}, "multi": {"max_recipes": None, "max_invoices_per_month": None}})
 async def test_invoice_limit_free(
     client: AsyncClient, auth_headers: dict, db_session: AsyncSession, restaurant: Restaurant,
     xml_file_path: str,
 ):
-    """3 invoices this month OK, 4th → 403."""
-    # Create 3 invoices (max for free)
+    """3 invoices this month OK, 4th → 403 (patched limit=3 for test)."""
+    # Create 3 invoices (max for free with patched limit)
     for _ in range(3):
         await _create_invoice(db_session, restaurant.id)
     await db_session.flush()

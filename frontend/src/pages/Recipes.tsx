@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, BookOpen, Camera, ChevronDown, ChevronRight, Pencil, FileText, Upload, X, Loader2, Trash2 } from 'lucide-react';
+import { Plus, Search, BookOpen, ChevronDown, ChevronRight, X, Trash2 } from 'lucide-react';
 import { useRecipes, useDeleteRecipe, useDeleteAllRecipes } from '../hooks/useRecipes';
-import { useExtractMenu } from '../hooks/useOnboarding';
 import { SkeletonList } from '../components/Skeleton';
 import ConfirmModal from '../components/ConfirmModal';
+import MenuUploadZone from '../components/MenuUploadZone';
 import type { RecipeListItem } from '../hooks/useRecipes';
 
 const STATUS_COLORS = {
@@ -78,11 +78,7 @@ export default function Recipes() {
   const { data, isLoading } = useRecipes(search || undefined);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [showUploadZone, setShowUploadZone] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const extractMutation = useExtractMenu();
   const deleteOneMutation = useDeleteRecipe();
   const deleteAllMutation = useDeleteAllRecipes();
   const [deleting, setDeleting] = useState<RecipeListItem | null>(null);
@@ -103,21 +99,6 @@ export default function Recipes() {
       },
     });
   }
-
-  function handleMenuFile(file: File) {
-    extractMutation.mutate(file, {
-      onSuccess: (data) => {
-        navigate('/onboarding', { state: { dishes: data.dishes, skipExtract: true } });
-      },
-    });
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleMenuFile(file);
-  };
 
   const recipes = data?.items ?? [];
   const isEmpty = !isLoading && !recipes.length && !search;
@@ -180,77 +161,12 @@ export default function Recipes() {
 
       {/* Upload zone (inline, toggleable) */}
       {showUploadZone && (
-        <div className="mb-4 space-y-3">
-          {extractMutation.isPending ? (
-            <div className="bg-white rounded-xl border border-stone-200 p-8 text-center">
-              <Loader2 size={40} className="text-orange-700 animate-spin mx-auto mb-3" />
-              <p className="text-stone-600 font-medium">Extraction des plats en cours...</p>
-              <p className="text-sm text-stone-400 mt-1">L'IA analyse votre carte</p>
-            </div>
-          ) : (
-            <div
-              onDrop={handleDrop}
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
-              className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
-                isDragging ? 'border-orange-500 bg-orange-50' : 'border-stone-300 bg-white'
-              }`}
-            >
-              <FileText size={36} className="mx-auto text-stone-300 mb-2" />
-              <p className="text-stone-600 font-medium mb-1">Glisse ta carte ici</p>
-              <p className="text-sm text-stone-400 mb-3">PDF ou image de ton menu</p>
-              <div className="flex items-center justify-center gap-3">
-                <label className="inline-flex items-center gap-2 bg-orange-700 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-orange-800 cursor-pointer transition-colors">
-                  <Upload size={16} />
-                  Choisir un fichier
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.webp,.pdf"
-                    className="hidden"
-                    onChange={(e) => e.target.files?.[0] && handleMenuFile(e.target.files[0])}
-                  />
-                </label>
-                <label className="inline-flex items-center gap-2 bg-white text-stone-700 px-4 py-2 rounded-xl text-sm font-medium border border-stone-300 hover:border-stone-400 cursor-pointer transition-colors">
-                  <Camera size={16} />
-                  Photo
-                  <input
-                    ref={cameraInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(e) => e.target.files?.[0] && handleMenuFile(e.target.files[0])}
-                  />
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* Separator */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 border-t border-stone-200" />
-            <span className="text-xs text-stone-400">ou</span>
-            <div className="flex-1 border-t border-stone-200" />
-          </div>
-
-          {/* Manual add button */}
-          <button
-            onClick={() => navigate('/recipes/new')}
-            className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-stone-50 transition-colors"
-          >
-            <Pencil size={18} className="text-stone-500" />
-            <div className="text-left">
-              <p className="text-sm font-medium text-stone-900">Ajouter un plat manuellement</p>
-              <p className="text-xs text-stone-500">Nom, prix, catégorie et ingrédients</p>
-            </div>
-          </button>
-
-          {extractMutation.isError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-              {extractMutation.error.message}
-            </div>
-          )}
+        <div className="mb-4">
+          <MenuUploadZone
+            onExtracted={(dishes) =>
+              navigate('/onboarding', { state: { dishes, skipExtract: true } })
+            }
+          />
         </div>
       )}
 
