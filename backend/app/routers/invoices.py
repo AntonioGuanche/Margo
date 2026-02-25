@@ -326,12 +326,6 @@ async def confirm_invoice(
             detail="Facture introuvable.",
         )
 
-    if invoice.status == "confirmed":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Cette facture a déjà été confirmée.",
-        )
-
     prices_updated = 0
     ingredients_created = 0
     aliases_saved = 0
@@ -498,12 +492,6 @@ async def patch_invoice(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Facture introuvable.",
-        )
-
-    if invoice.status == "confirmed":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Impossible de modifier une facture confirmée.",
         )
 
     if body.supplier_name is not None:

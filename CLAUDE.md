@@ -172,4 +172,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 26 — RecipeLinker chip component with auto-suggestion (GET /ingredients/{id}/recipes), cleaned RecipeLink schema (removed legacy fields). Previous: Sprint 25 (ingredient chips), Sprint 24 (delete confirmed invoices), Sprint 23 (MenuUploadZone, multi-recipe invoice lines, delete invoice, unlimited free plan). See @PLAN.md for original roadmap.
+Sprint 27 — Allow re-confirm, patch, and delete on confirmed invoices (removed all 3 status blocks). Previous: Sprint 26 (RecipeLinker chip component, GET /ingredients/{id}/recipes), Sprint 25 (ingredient chips), Sprint 24 (delete confirmed invoices), Sprint 23 (MenuUploadZone, multi-recipe invoice lines, delete invoice, unlimited free plan). See @PLAN.md for original roadmap.

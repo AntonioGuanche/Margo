@@ -415,6 +415,71 @@ async def test_confirm_multi_recipe(client, auth_headers, db_session, restaurant
     assert count_result.scalar_one() == 2
 
 
+async def test_reconfirm_allowed(client, auth_headers, db_session, restaurant, xml_file_path):
+    """Re-confirming a confirmed invoice → 200 (allowed since Sprint 27)."""
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id, name="Poulet", unit="kg", current_price=8.0
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    # First confirm
+    resp1 = await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={"lines": [{"description": "Poulet", "ingredient_id": ingredient.id, "unit_price": 9.0, "unit": "kg"}]},
+        headers=auth_headers,
+    )
+    assert resp1.status_code == 200
+
+    # Re-confirm with corrected price
+    resp2 = await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={"lines": [{"description": "Poulet", "ingredient_id": ingredient.id, "unit_price": 9.50, "unit": "kg"}]},
+        headers=auth_headers,
+    )
+    assert resp2.status_code == 200
+    assert resp2.json()["prices_updated"] == 1
+
+    await db_session.refresh(ingredient)
+    assert ingredient.current_price == 9.50
+
+
+async def test_patch_confirmed_allowed(client, auth_headers, xml_file_path):
+    """Patching supplier/date on a confirmed invoice → 200 (allowed since Sprint 27)."""
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    # Confirm
+    await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={"lines": []},
+        headers=auth_headers,
+    )
+
+    # Patch confirmed invoice — now allowed
+    resp = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"supplier_name": "Nouveau Fournisseur"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["supplier_name"] == "Nouveau Fournisseur"
+
+
 async def test_invoices_protected(client):
     """Without auth token → 401."""
     resp = await client.get("/api/invoices")
