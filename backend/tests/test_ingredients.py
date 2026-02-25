@@ -4,6 +4,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ingredient import Ingredient
+from app.models.recipe import Recipe, RecipeIngredient
 from app.models.restaurant import Restaurant
 from app.services.auth import create_access_token
 
@@ -267,3 +268,74 @@ async def test_cross_restaurant_isolation(
     # Restaurant B cannot see it in list either
     list_resp = await client.get("/api/ingredients", headers=headers_b)
     assert list_resp.json()["total"] == 0
+
+
+# --- INGREDIENT RECIPES ---
+
+
+async def test_get_ingredient_recipes(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    db_session: AsyncSession,
+    restaurant: Restaurant,
+) -> None:
+    """GET /api/ingredients/{id}/recipes returns recipes using this ingredient."""
+    # Create ingredient
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id, name="Boeuf haché", unit="kg", current_price=12.0
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    # Create two recipes that use the ingredient
+    recipe1 = Recipe(
+        restaurant_id=restaurant.id, name="Spaghetti Bolo", selling_price=14.0
+    )
+    recipe2 = Recipe(
+        restaurant_id=restaurant.id, name="Lasagne", selling_price=16.0
+    )
+    db_session.add_all([recipe1, recipe2])
+    await db_session.flush()
+    await db_session.refresh(recipe1)
+    await db_session.refresh(recipe2)
+
+    ri1 = RecipeIngredient(
+        recipe_id=recipe1.id, ingredient_id=ingredient.id, quantity=0.15, unit="kg"
+    )
+    ri2 = RecipeIngredient(
+        recipe_id=recipe2.id, ingredient_id=ingredient.id, quantity=0.12, unit="kg"
+    )
+    db_session.add_all([ri1, ri2])
+    await db_session.flush()
+
+    # Query the endpoint
+    resp = await client.get(
+        f"/api/ingredients/{ingredient.id}/recipes", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["items"]) == 2
+    names = {item["recipe_name"] for item in data["items"]}
+    assert names == {"Spaghetti Bolo", "Lasagne"}
+
+
+async def test_get_ingredient_recipes_empty(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    db_session: AsyncSession,
+    restaurant: Restaurant,
+) -> None:
+    """GET /api/ingredients/{id}/recipes returns empty if no recipes use it."""
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id, name="Sel", unit="kg", current_price=1.0
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    resp = await client.get(
+        f"/api/ingredients/{ingredient.id}/recipes", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["items"]) == 0

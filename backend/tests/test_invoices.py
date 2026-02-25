@@ -349,6 +349,72 @@ async def test_delete_confirmed_allowed(client, auth_headers, db_session, restau
     assert resp.status_code == 204
 
 
+async def test_confirm_multi_recipe(client, auth_headers, db_session, restaurant, xml_file_path):
+    """Confirm with recipe_links → multiple RecipeIngredient rows created."""
+    # Create ingredient
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id, name="Viande hachée", unit="kg", current_price=10.0
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    # Create two existing recipes
+    recipe1 = Recipe(
+        restaurant_id=restaurant.id, name="Spaghetti Bolo", selling_price=14.0
+    )
+    recipe2 = Recipe(
+        restaurant_id=restaurant.id, name="Lasagne", selling_price=16.0
+    )
+    db_session.add_all([recipe1, recipe2])
+    await db_session.flush()
+    await db_session.refresh(recipe1)
+    await db_session.refresh(recipe2)
+
+    # Upload invoice
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    # Confirm with multi-recipe links
+    confirm_resp = await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={
+            "lines": [
+                {
+                    "description": "Viande hachée",
+                    "ingredient_id": ingredient.id,
+                    "unit_price": 12.00,
+                    "unit": "kg",
+                    "recipe_links": [
+                        {"recipe_id": recipe1.id, "quantity": 0.15, "unit": "kg"},
+                        {"recipe_id": recipe2.id, "quantity": 0.12, "unit": "kg"},
+                    ],
+                },
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert confirm_resp.status_code == 200
+    data = confirm_resp.json()
+    assert data["prices_updated"] == 1
+
+    # Verify 2 RecipeIngredient rows were created
+    from sqlalchemy import select, func
+    count_result = await db_session.execute(
+        select(func.count()).select_from(
+            select(RecipeIngredient).where(
+                RecipeIngredient.ingredient_id == ingredient.id
+            ).subquery()
+        )
+    )
+    assert count_result.scalar_one() == 2
+
+
 async def test_invoices_protected(client):
     """Without auth token → 401."""
     resp = await client.get("/api/invoices")

@@ -8,13 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_restaurant
 from app.models.ingredient import Ingredient
-from app.models.recipe import RecipeIngredient
-from app.models.restaurant import Restaurant
 from app.models.invoice import Invoice
 from app.models.price_history import IngredientPriceHistory
+from app.models.recipe import Recipe, RecipeIngredient
+from app.models.restaurant import Restaurant
 from app.schemas.ingredient import (
     IngredientCreate,
     IngredientListResponse,
+    IngredientRecipeItem,
+    IngredientRecipesResponse,
     IngredientResponse,
     IngredientUpdate,
     PriceHistoryEntry,
@@ -217,6 +219,54 @@ async def get_price_history(
         current_price=ingredient.current_price,
         history=history,
     )
+
+
+@router.get("/{ingredient_id}/recipes", response_model=IngredientRecipesResponse)
+async def get_ingredient_recipes(
+    ingredient_id: int,
+    restaurant: Restaurant = Depends(get_current_restaurant),
+    db: AsyncSession = Depends(get_db),
+) -> IngredientRecipesResponse:
+    """Get recipes that use this ingredient (for auto-suggestion in invoice review)."""
+    # Verify ingredient belongs to restaurant
+    result = await db.execute(
+        select(Ingredient).where(
+            Ingredient.id == ingredient_id,
+            Ingredient.restaurant_id == restaurant.id,
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ingrédient introuvable",
+        )
+
+    # Query recipes linked to this ingredient
+    rows = await db.execute(
+        select(
+            Recipe.id,
+            Recipe.name,
+            Recipe.category,
+            RecipeIngredient.quantity,
+            RecipeIngredient.unit,
+        )
+        .join(RecipeIngredient, RecipeIngredient.recipe_id == Recipe.id)
+        .where(
+            RecipeIngredient.ingredient_id == ingredient_id,
+            Recipe.restaurant_id == restaurant.id,
+        )
+    )
+    items = [
+        IngredientRecipeItem(
+            recipe_id=row.id,
+            recipe_name=row.name,
+            category=row.category,
+            quantity=row.quantity,
+            unit=row.unit,
+        )
+        for row in rows.all()
+    ]
+    return IngredientRecipesResponse(items=items)
 
 
 @router.delete("/{ingredient_id}", status_code=status.HTTP_204_NO_CONTENT)

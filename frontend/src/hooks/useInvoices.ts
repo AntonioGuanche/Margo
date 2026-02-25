@@ -72,13 +72,13 @@ export interface InvoiceDetailResponse {
 }
 
 interface RecipeLinkRequest {
-  add_to_recipe_id?: number;
-  recipe_quantity?: number;
-  recipe_unit?: string;
+  recipe_id?: number;
   create_recipe_name?: string;
   create_recipe_price?: number;
   create_recipe_category?: string;
   create_recipe_is_homemade?: boolean;
+  quantity?: number;
+  unit?: string;
 }
 
 interface InvoiceConfirmLine {

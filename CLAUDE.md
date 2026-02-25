@@ -54,7 +54,7 @@ margo/
 │   │       └── rate_limit.py  # AI + upload rate limiting
 │   ├── alembic/               # DB migrations
 │   ├── scripts/start.sh       # Alembic upgrade + uvicorn launch
-│   ├── tests/                 # pytest + httpx (123 tests)
+│   ├── tests/                 # pytest + httpx (126 tests)
 │   ├── Dockerfile
 │   └── pyproject.toml
 ├── frontend/
@@ -122,7 +122,7 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - When an ingredient price changes → recalculate ALL recipes using that ingredient
 - Margin thresholds: 🟢 <30% food cost, 🟠 30-35%, 🔴 >35% (configurable per restaurant)
 - Invoice matching: exact name → fuzzy (pg_trgm trigram) → suggest new ingredient
-- **Multi-recipe per invoice line:** each line can be linked to multiple recipes via `recipe_links` array (RecipeLinkRequest schema). Backend has backward compat with legacy single-recipe fields.
+- **Multi-recipe per invoice line:** each line can be linked to multiple recipes via `recipe_links` array (RecipeLink schema with `recipe_id`, `quantity`, `unit`). No legacy single-recipe fields.
 - After user confirms a match, store it as IngredientAlias for future auto-matching
 - **Invoice portions:** unit_parser.py parses Belgian packaging patterns (24/3, CASIER 24, 6x25cl), calculates volume-based portions for beer/wine/spirit with interactive serving size
 - **Onboarding:** photo/PDF of menu → AI extracts dishes (with cocktail category) → AI suggests ingredients (homemade only) → purchased items auto-get ingredient = product name (qty 1, unit piece) → batch creation
@@ -138,6 +138,7 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - **Delete recipes:** Individual delete via Trash2 hover button + ConfirmModal. "Supprimer tout le menu" with SUPPRIMER text confirmation. Backend DELETE /all route placed before /{recipe_id} to avoid path collision.
 - **Delete invoices:** Trash2 hover button on ALL invoices (including confirmed) in Invoices.tsx + ConfirmModal. Backend DELETE /{invoice_id} allows deleting any invoice.
 - **Ingredient chips:** InvoiceReview.tsx shows assigned ingredients as orange chips (with match score % and X button) instead of dropdown. "Changer" button reveals dropdown override. Create mode shows green "Sera créé" badge.
+- **RecipeLinker:** Chip-based multi-recipe component in InvoiceReview. Auto-fetches existing recipe links via GET `/api/ingredients/{id}/recipes` and pre-fills chips. Users can add/remove recipes, adjust quantity/unit per chip.
 - **MenuUploadZone:** Shared component (components/MenuUploadZone.tsx) used in Dashboard empty state and Recipes page. Supports drag&drop, multi-file sequential extraction with progress, camera, optional manual add button.
 - **€ symbol:** Price input in StepDishes uses absolute-positioned € suffix (not in placeholder)
 
@@ -171,4 +172,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 25 — Ingredient chips in InvoiceReview (replace dropdown with chip when assigned). Previous: Sprint 24 (allow deleting confirmed invoices), Sprint 23 (MenuUploadZone, multi-recipe invoice lines, delete invoice, unlimited free plan). See @PLAN.md for original roadmap.
+Sprint 26 — RecipeLinker chip component with auto-suggestion (GET /ingredients/{id}/recipes), cleaned RecipeLink schema (removed legacy fields). Previous: Sprint 25 (ingredient chips), Sprint 24 (delete confirmed invoices), Sprint 23 (MenuUploadZone, multi-recipe invoice lines, delete invoice, unlimited free plan). See @PLAN.md for original roadmap.

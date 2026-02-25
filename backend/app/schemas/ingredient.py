@@ -58,3 +58,17 @@ class PriceHistoryResponse(BaseModel):
     ingredient_name: str
     current_price: float | None
     history: list[PriceHistoryEntry]
+
+
+# --- Ingredient recipes ---
+
+class IngredientRecipeItem(BaseModel):
+    recipe_id: int
+    recipe_name: str
+    category: str | None = None
+    quantity: float
+    unit: str
+
+
+class IngredientRecipesResponse(BaseModel):
+    items: list[IngredientRecipeItem]
