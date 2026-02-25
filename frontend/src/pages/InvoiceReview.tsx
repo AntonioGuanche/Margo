@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
+  AlertTriangle,
   ArrowLeft,
   FileCheck,
   Check,
@@ -398,7 +399,7 @@ function LineRow({
       } p-4 ${line.ignored ? 'opacity-50' : ''}`}
     >
       {/* Header */}
-      <div className="flex items-start justify-between gap-2 mb-3">
+      <div className="flex items-start justify-between gap-2 flex-wrap sm:flex-nowrap mb-3">
         <div className="flex-1 min-w-0">
           {line.is_manual ? (
             <input
@@ -550,6 +551,14 @@ function LineRow({
       {/* Ingredient assignment — only when not ignored */}
       {!line.ignored && (
         <div className="space-y-2">
+          {/* No-match help banner */}
+          {!line.ingredient_id && !line.create_ingredient_name && (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2">
+              <AlertTriangle size={14} className="shrink-0" />
+              <span>Choisis un ingrédient ci-dessous pour mettre à jour son prix.</span>
+            </div>
+          )}
+
           {line.ingredient_id || line.create_ingredient_name ? (
             /* CHIP MODE — ingrédient assigné */
             <>
@@ -979,12 +988,21 @@ export default function InvoiceReview() {
             </p>
           )}
         </div>
-        <button
-          onClick={() => navigate('/invoices')}
-          className="bg-orange-700 text-white px-6 py-3 rounded-xl font-medium hover:bg-orange-800 transition-colors"
-        >
-          Voir mes factures
-        </button>
+        <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
+          <button
+            onClick={() => navigate('/invoices/upload')}
+            className="bg-orange-700 text-white px-6 py-3 rounded-xl font-medium hover:bg-orange-800 transition-colors flex items-center justify-center gap-2"
+          >
+            <Plus size={18} />
+            Importer une autre facture
+          </button>
+          <button
+            onClick={() => navigate('/invoices')}
+            className="bg-stone-100 text-stone-700 px-6 py-3 rounded-xl font-medium hover:bg-stone-200 transition-colors"
+          >
+            Voir mes factures
+          </button>
+        </div>
       </div>
     );
   }
@@ -1008,7 +1026,7 @@ export default function InvoiceReview() {
 
       {/* Invoice metadata — editable supplier & date */}
       <div className="bg-white rounded-xl border border-stone-200 p-4 mb-4">
-        <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
           <div>
             <span className="text-stone-500 flex items-center gap-1">
               Fournisseur <Pencil size={12} className="text-stone-400" />
@@ -1114,10 +1132,49 @@ export default function InvoiceReview() {
         </div>
       )}
 
+      {/* Pre-confirm summary */}
+      {(() => {
+        const assignedCount = activeLines.filter(
+          ({ line }) => line.ingredient_id || line.create_ingredient_name
+        ).length;
+        const newIngCount = activeLines.filter(
+          ({ line }) => line.create_ingredient_name
+        ).length;
+        return (
+          <>
+            {assignedCount > 0 && (
+              <div className="bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 mb-3 text-sm text-stone-600 space-y-1">
+                <p>
+                  <span className="font-semibold text-stone-900">{assignedCount}</span> ligne{assignedCount > 1 ? 's' : ''}
+                  {assignedCount > 1 ? ' seront traitées' : ' sera traitée'}
+                </p>
+                {newIngCount > 0 && (
+                  <p>
+                    <span className="font-semibold text-stone-900">{newIngCount}</span> nouvel ingrédient{newIngCount > 1 ? 's' : ''}
+                    {newIngCount > 1 ? ' seront créés' : ' sera créé'}
+                  </p>
+                )}
+                {ignoredLines.length > 0 && (
+                  <p className="text-stone-400">
+                    {ignoredLines.length} ligne{ignoredLines.length > 1 ? 's' : ''} ignorée{ignoredLines.length > 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {assignedCount === 0 && activeLines.length > 0 && (
+              <p className="text-sm text-amber-600 text-center mb-2">
+                Assigne au moins un ingrédient pour confirmer la facture.
+              </p>
+            )}
+          </>
+        );
+      })()}
+
       {/* Confirm button */}
       <button
         onClick={handleConfirm}
-        disabled={confirm.isPending}
+        disabled={confirm.isPending || activeLines.filter(({ line }) => line.ingredient_id || line.create_ingredient_name).length === 0}
         className="w-full bg-orange-700 text-white py-3 rounded-xl font-medium hover:bg-orange-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
       >
         {confirm.isPending ? (

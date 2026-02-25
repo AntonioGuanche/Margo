@@ -29,7 +29,7 @@ from app.schemas.invoice import (
     InvoiceUploadResponse,
 )
 from app.services.alerts import check_and_create_alerts
-from app.services.costing import recalculate_recipes_for_ingredient
+from app.services.costing import convert_quantity, recalculate_recipes_for_ingredient
 from app.services.invoice_router import parse_invoice_file
 from app.services.matching import match_invoice_lines, save_alias
 from app.services.unit_parser import (
@@ -373,21 +373,27 @@ async def confirm_invoice(
             ingredient = ing_result.scalar_one_or_none()
             if ingredient:
                 old_price = ingredient.current_price
-                ingredient.current_price = line.unit_price
-                # Sync ingredient unit with invoice unit (price is per this unit)
-                if line.unit and line.unit.lower() in ("g", "kg", "ml", "cl", "l", "piece", "pce"):
-                    ingredient.unit = line.unit.lower()
+                # Normalize price to ingredient's stored unit
+                new_price = line.unit_price
+                if new_price is not None and line.unit:
+                    line_unit = line.unit.lower()
+                    ing_unit = ingredient.unit.lower()
+                    if line_unit != ing_unit:
+                        factor = convert_quantity(1, ing_unit, line_unit)
+                        if factor != 1.0:
+                            new_price = round(new_price * factor, 6)
+                ingredient.current_price = new_price
                 ingredient.last_updated = dt.datetime.utcnow()
                 if invoice.supplier_name:
                     ingredient.supplier_name = invoice.supplier_name
                 prices_updated += 1
                 affected_ingredient_ids.add(ingredient_id)
-                price_changes.append((ingredient_id, old_price, line.unit_price))
+                price_changes.append((ingredient_id, old_price, new_price))
 
-                # Record price history
+                # Record price history (normalized price)
                 history = IngredientPriceHistory(
                     ingredient_id=ingredient_id,
-                    price=line.unit_price,
+                    price=new_price,
                     date=invoice.invoice_date or dt.date.today(),
                     invoice_id=invoice.id,
                 )

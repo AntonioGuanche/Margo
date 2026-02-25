@@ -480,21 +480,20 @@ async def test_patch_confirmed_allowed(client, auth_headers, xml_file_path):
     assert resp.json()["supplier_name"] == "Nouveau Fournisseur"
 
 
-async def test_confirm_syncs_ingredient_unit(
+async def test_confirm_normalizes_price_to_ingredient_unit(
     client, auth_headers, db_session, restaurant, xml_file_path
 ):
-    """Confirm with unit='kg' on ingredient with unit='g' → ingredient.unit becomes 'kg'."""
-    # Ingredient created by onboarding with "g" unit (recipe-level unit)
+    """Confirm with unit='g' on ingredient in 'kg' → price normalized to €/kg, unit unchanged."""
+    # Ingredient stored in kg
     ingredient = Ingredient(
         restaurant_id=restaurant.id,
-        name="Fromage râpé",
-        unit="g",
-        current_price=None,
+        name="Beurre",
+        unit="kg",
+        current_price=20.0,
     )
     db_session.add(ingredient)
     await db_session.flush()
     await db_session.refresh(ingredient)
-    assert ingredient.unit == "g"
 
     # Upload invoice
     with open(xml_file_path, "rb") as f:
@@ -505,13 +504,57 @@ async def test_confirm_syncs_ingredient_unit(
         )
     invoice_id = upload_resp.json()["invoice_id"]
 
-    # Confirm with unit="kg" (supplier unit) — should sync ingredient.unit
+    # Confirm with unit="g", unit_price=0.024 (€/g) → should normalize to 24 €/kg
     confirm_resp = await client.post(
         f"/api/invoices/{invoice_id}/confirm",
         json={
             "lines": [
                 {
-                    "description": "Fromage râpé",
+                    "description": "Beurre",
+                    "ingredient_id": ingredient.id,
+                    "unit_price": 0.024,
+                    "unit": "g",
+                },
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert confirm_resp.status_code == 200
+
+    # Unit stays "kg", price normalized: 0.024 €/g × 1000 = 24 €/kg
+    await db_session.refresh(ingredient)
+    assert ingredient.unit == "kg"
+    assert ingredient.current_price == pytest.approx(24.0, abs=0.01)
+
+
+async def test_confirm_same_unit_no_normalization(
+    client, auth_headers, db_session, restaurant, xml_file_path
+):
+    """Confirm with same unit → price stored as-is."""
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Fromage",
+        unit="kg",
+        current_price=20.0,
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={
+            "lines": [
+                {
+                    "description": "Fromage",
                     "ingredient_id": ingredient.id,
                     "unit_price": 24.00,
                     "unit": "kg",
@@ -520,19 +563,17 @@ async def test_confirm_syncs_ingredient_unit(
         },
         headers=auth_headers,
     )
-    assert confirm_resp.status_code == 200
 
-    # Verify ingredient.unit synced to "kg"
     await db_session.refresh(ingredient)
     assert ingredient.unit == "kg"
     assert ingredient.current_price == 24.00
 
 
-async def test_confirm_unit_sync_fixes_food_cost(
+async def test_confirm_price_normalization_fixes_food_cost(
     client, auth_headers, db_session, restaurant, xml_file_path
 ):
-    """Full scenario: ingredient unit='g' + recipe 80g → confirm with kg → food cost correct."""
-    # Ingredient created with "g" unit (from onboarding)
+    """Full scenario: ingredient in g + recipe 80g → confirm with kg price → food cost correct."""
+    # Ingredient stored in "g" (from onboarding)
     ingredient = Ingredient(
         restaurant_id=restaurant.id,
         name="Fromage belge",
@@ -543,7 +584,7 @@ async def test_confirm_unit_sync_fixes_food_cost(
     await db_session.flush()
     await db_session.refresh(ingredient)
 
-    # Recipe using 80g of this ingredient
+    # Recipe using 80g
     recipe = Recipe(
         restaurant_id=restaurant.id,
         name="Portion de Fromage",
@@ -563,7 +604,12 @@ async def test_confirm_unit_sync_fixes_food_cost(
     db_session.add(ri)
     await db_session.flush()
 
-    # Upload + confirm invoice with kg unit
+    # Confirm: invoice says 24 €/kg, ingredient is in g
+    # → normalize: convert_quantity(1, "g", "kg") = 0.001, factor = 0.001
+    # Wait — let me think: factor = convert_quantity(1, ing_unit="g", line_unit="kg")
+    # convert_quantity(1, "g", "kg") = 1 * 0.001 / 1.0 = 0.001
+    # new_price = 24 * 0.001 = 0.024 €/g ✓
+    # Recipe: 80g × 0.024 €/g = 1.92€ ✓
     with open(xml_file_path, "rb") as f:
         upload_resp = await client.post(
             "/api/invoices/upload",
@@ -587,11 +633,12 @@ async def test_confirm_unit_sync_fixes_food_cost(
         headers=auth_headers,
     )
 
-    # After confirm: ingredient.unit = "kg", price = 24€/kg
-    # Recipe: 80g → convert_quantity(80, "g", "kg") = 0.08kg × 24€/kg = 1.92€
+    # Unit stays "g", price normalized to 0.024 €/g
     await db_session.refresh(ingredient)
-    assert ingredient.unit == "kg"
+    assert ingredient.unit == "g"
+    assert ingredient.current_price == pytest.approx(0.024, abs=0.0001)
 
+    # Recipe: 80g × 0.024 €/g = 1.92€
     await db_session.refresh(recipe)
     assert recipe.food_cost == pytest.approx(1.92, abs=0.01)
     assert recipe.food_cost_percent == pytest.approx(48.0, abs=0.1)
@@ -600,7 +647,7 @@ async def test_confirm_unit_sync_fixes_food_cost(
 async def test_confirm_ignores_unknown_unit(
     client, auth_headers, db_session, restaurant, xml_file_path
 ):
-    """Confirm with unit='casier' → ingredient.unit unchanged (not a recognized unit)."""
+    """Confirm with unit='casier' → no conversion, price stored as-is."""
     ingredient = Ingredient(
         restaurant_id=restaurant.id,
         name="Bière Blonde",
@@ -634,7 +681,7 @@ async def test_confirm_ignores_unknown_unit(
         headers=auth_headers,
     )
 
-    # unit stays "piece" — "casier" is not a recognized unit
+    # unit stays "piece", price as-is (no conversion possible)
     await db_session.refresh(ingredient)
     assert ingredient.unit == "piece"
     assert ingredient.current_price == 1.80

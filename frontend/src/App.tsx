@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -22,6 +22,18 @@ import Simulator from './pages/Simulator';
 import SimulatorHome from './pages/SimulatorHome';
 import Pricing from './pages/Pricing';
 import Settings from './pages/Settings';
+
+function NotFound() {
+  return (
+    <div className="text-center py-16">
+      <p className="text-6xl font-bold text-stone-200 mb-4">404</p>
+      <p className="text-stone-600 font-medium mb-2">Page introuvable</p>
+      <a href="/" className="text-orange-700 hover:underline text-sm">
+        Retour au dashboard
+      </a>
+    </div>
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -67,7 +79,11 @@ export default function App() {
             <Route path="/invoices/:id/review" element={<InvoiceReview />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
+
+          {/* Catch-all for unauthenticated */}
+          <Route path="*" element={<Navigate to="/landing" replace />} />
         </Routes>
       </BrowserRouter>
       </ErrorBoundary>

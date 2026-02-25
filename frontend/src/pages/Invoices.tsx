@@ -80,7 +80,7 @@ function InvoiceRow({ invoice, onClick, onDelete }: { invoice: InvoiceListItem; 
         <StatusBadge status={invoice.status} />
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="p-1.5 text-stone-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all"
+          className="p-1.5 text-stone-300 hover:text-red-600 md:opacity-0 md:group-hover:opacity-100 transition-all"
           title="Supprimer"
         >
           <Trash2 size={14} />
