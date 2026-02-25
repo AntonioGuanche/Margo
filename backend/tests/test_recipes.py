@@ -247,6 +247,122 @@ async def test_recipe_without_prices(client: AsyncClient, auth_headers: dict, in
     assert data["food_cost_percent"] is None
 
 
+async def test_unit_conversion_g_to_kg(client: AsyncClient, auth_headers: dict, db_session, restaurant):
+    """80g of an ingredient at 24€/kg → food_cost = 1.92€, not 1920€."""
+    fromage = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Fromage râpé",
+        unit="kg",
+        current_price=24.0,
+    )
+    db_session.add(fromage)
+    await db_session.flush()
+    await db_session.refresh(fromage)
+
+    payload = {
+        "name": "Croque Monsieur",
+        "selling_price": 12.0,
+        "ingredients": [
+            {"ingredient_id": fromage.id, "quantity": 80, "unit": "g"},
+        ],
+    }
+    resp = await client.post("/api/recipes", json=payload, headers=auth_headers)
+    assert resp.status_code == 201
+    data = resp.json()
+
+    # 80g → 0.08kg × 24€/kg = 1.92€
+    assert abs(data["food_cost"] - 1.92) < 0.01
+    assert abs(data["food_cost_percent"] - 16.0) < 0.1
+
+    # Check unit_cost_unit field
+    ing = data["ingredients"][0]
+    assert ing["unit_cost_unit"] == "kg"
+    assert ing["unit_cost"] == 24.0
+    assert abs(ing["line_cost"] - 1.92) < 0.01
+
+
+async def test_unit_conversion_cl_to_l(client: AsyncClient, auth_headers: dict, db_session, restaurant):
+    """33cl of an ingredient at 2.50€/l → food_cost = 0.825€."""
+    lait = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Lait",
+        unit="l",
+        current_price=2.50,
+    )
+    db_session.add(lait)
+    await db_session.flush()
+    await db_session.refresh(lait)
+
+    payload = {
+        "name": "Chocolat chaud",
+        "selling_price": 5.0,
+        "ingredients": [
+            {"ingredient_id": lait.id, "quantity": 33, "unit": "cl"},
+        ],
+    }
+    resp = await client.post("/api/recipes", json=payload, headers=auth_headers)
+    assert resp.status_code == 201
+    data = resp.json()
+
+    # 33cl → 0.33l × 2.50€/l = 0.825€
+    assert abs(data["food_cost"] - 0.825) < 0.01
+
+    ing = data["ingredients"][0]
+    assert ing["unit_cost_unit"] == "l"
+
+
+async def test_unit_conversion_same_unit(client: AsyncClient, auth_headers: dict, ingredients: list[Ingredient]):
+    """Same unit (kg→kg) still works correctly."""
+    payload = _recipe_payload(ingredients)
+    resp = await client.post("/api/recipes", json=payload, headers=auth_headers)
+    assert resp.status_code == 201
+    data = resp.json()
+
+    # 0.2kg × 3.50€/kg + 0.15kg × 12.00€/kg = 0.70 + 1.80 = 2.50
+    assert abs(data["food_cost"] - 2.50) < 0.01
+    # unit_cost_unit should be the ingredient's unit
+    assert data["ingredients"][0]["unit_cost_unit"] == "kg"
+
+
+async def test_cascade_recalculate_with_conversion(
+    client: AsyncClient, auth_headers: dict, db_session, restaurant
+):
+    """Price change → cascade recalculate with unit conversion."""
+    beurre = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Beurre",
+        unit="kg",
+        current_price=10.0,
+    )
+    db_session.add(beurre)
+    await db_session.flush()
+    await db_session.refresh(beurre)
+
+    # Recipe uses 200g
+    payload = {
+        "name": "Tartine",
+        "selling_price": 6.0,
+        "ingredients": [
+            {"ingredient_id": beurre.id, "quantity": 200, "unit": "g"},
+        ],
+    }
+    create_resp = await client.post("/api/recipes", json=payload, headers=auth_headers)
+    recipe_id = create_resp.json()["id"]
+    # 200g → 0.2kg × 10€/kg = 2.0€
+    assert abs(create_resp.json()["food_cost"] - 2.0) < 0.01
+
+    # Update beurre price to 15€/kg
+    await client.put(
+        f"/api/ingredients/{beurre.id}",
+        json={"current_price": 15.0},
+        headers=auth_headers,
+    )
+
+    # Check recipe recalculated: 200g → 0.2kg × 15€/kg = 3.0€
+    resp = await client.get(f"/api/recipes/{recipe_id}", headers=auth_headers)
+    assert abs(resp.json()["food_cost"] - 3.0) < 0.01
+
+
 async def test_cross_restaurant_isolation(client: AsyncClient, db_session, auth_headers: dict, ingredients: list[Ingredient]):
     """Cannot access recipes from another restaurant."""
     from app.models.restaurant import Restaurant

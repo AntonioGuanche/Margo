@@ -20,6 +20,7 @@ class RecipeIngredientResponse(BaseModel):
     quantity: float
     unit: str
     unit_cost: float | None
+    unit_cost_unit: str | None = None
     line_cost: float | None
 
 

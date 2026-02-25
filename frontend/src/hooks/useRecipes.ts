@@ -10,6 +10,7 @@ export interface RecipeIngredient {
   quantity: number;
   unit: string;
   unit_cost: number | null;
+  unit_cost_unit: string | null;
   line_cost: number | null;
 }
 

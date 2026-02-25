@@ -15,7 +15,7 @@ from app.schemas.simulator import (
     SimulatedIngredient,
     SimulationState,
 )
-from app.services.costing import get_margin_status, recalculate_recipe
+from app.services.costing import convert_quantity, get_margin_status, recalculate_recipe
 
 router = APIRouter()
 
@@ -32,7 +32,8 @@ def _build_state(
     for ing in ingredients_data:
         line_cost = None
         if ing["unit_price"] is not None:
-            line_cost = round(ing["quantity"] * ing["unit_price"], 4)
+            converted_qty = convert_quantity(ing["quantity"], ing["unit"], ing["ingredient_unit"])
+            line_cost = round(converted_qty * ing["unit_price"], 4)
             food_cost += line_cost
 
         sim_ingredients.append(
@@ -116,6 +117,7 @@ async def simulate(
             "ingredient_name": ri.ingredient.name,
             "quantity": ri.quantity,
             "unit": ri.unit,
+            "ingredient_unit": ri.ingredient.unit,
             "unit_price": unit_price,
             "changed": False,
         })
@@ -139,6 +141,7 @@ async def simulate(
             "ingredient_name": ri.ingredient.name,
             "quantity": sim_quantity,
             "unit": ri.unit,
+            "ingredient_unit": ri.ingredient.unit,
             "unit_price": sim_unit_price,
             "changed": changed,
         })
@@ -206,6 +209,7 @@ async def apply_simulation(
             "ingredient_name": ri.ingredient.name,
             "quantity": ri.quantity,
             "unit": ri.unit,
+            "ingredient_unit": ri.ingredient.unit,
             "unit_price": ri.ingredient.current_price,
             "changed": False,
         })

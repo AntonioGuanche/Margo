@@ -132,7 +132,7 @@ export default function RecipeDetail() {
             <div className="text-right">
               {ri.unit_cost != null && (
                 <p className="text-xs text-stone-400">
-                  {ri.unit_cost.toFixed(2)} €/{ri.unit}
+                  {ri.unit_cost.toFixed(2)} €/{ri.unit_cost_unit ?? ri.unit}
                 </p>
               )}
               <p className="text-sm font-medium text-stone-700">

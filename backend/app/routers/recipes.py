@@ -20,7 +20,7 @@ from app.schemas.recipe import (
     RecipeUpdate,
 )
 from app.middleware.plan_limits import require_recipe_quota
-from app.services.costing import calculate_food_cost, get_margin_status, recalculate_recipe
+from app.services.costing import calculate_food_cost, convert_quantity, get_margin_status, recalculate_recipe
 
 router = APIRouter()
 
@@ -49,7 +49,11 @@ def _build_recipe_response(recipe: Recipe) -> RecipeResponse:
     ingredient_responses = []
     for ri in recipe.recipe_ingredients:
         unit_cost = ri.ingredient.current_price
-        line_cost = round(ri.quantity * unit_cost, 4) if unit_cost is not None else None
+        if unit_cost is not None:
+            converted_qty = convert_quantity(ri.quantity, ri.unit, ri.ingredient.unit)
+            line_cost = round(converted_qty * unit_cost, 4)
+        else:
+            line_cost = None
         ingredient_responses.append(
             RecipeIngredientResponse(
                 id=ri.id,
@@ -58,6 +62,7 @@ def _build_recipe_response(recipe: Recipe) -> RecipeResponse:
                 quantity=ri.quantity,
                 unit=ri.unit,
                 unit_cost=unit_cost,
+                unit_cost_unit=ri.ingredient.unit,
                 line_cost=line_cost,
             )
         )
@@ -189,7 +194,7 @@ async def create_recipe(
     food_cost_percent: float | None = None
     if data.is_homemade:
         ingredients_with_prices = [
-            (ri.quantity, found_ingredients[ri.ingredient_id].current_price)
+            (ri.quantity, ri.unit, found_ingredients[ri.ingredient_id].current_price, found_ingredients[ri.ingredient_id].unit)
             for ri in data.ingredients
         ]
         food_cost, food_cost_percent = calculate_food_cost(ingredients_with_prices, data.selling_price)

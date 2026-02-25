@@ -8,14 +8,65 @@ from app.models.ingredient import Ingredient
 from app.models.recipe import Recipe, RecipeIngredient
 
 
+# Conversion factors: from_unit → (base_unit, factor)
+# Weight base = kg, Volume base = l
+UNIT_TO_BASE: dict[str, tuple[str, float]] = {
+    # Weight
+    "g": ("kg", 0.001),
+    "kg": ("kg", 1.0),
+    # Volume
+    "ml": ("l", 0.001),
+    "cl": ("l", 0.01),
+    "l": ("l", 1.0),
+    # Countable
+    "piece": ("piece", 1.0),
+    "pce": ("piece", 1.0),
+}
+
+
+def convert_quantity(qty: float, from_unit: str, to_unit: str) -> float:
+    """Convert quantity from from_unit to to_unit.
+
+    Examples:
+        convert_quantity(80, "g", "kg") → 0.08
+        convert_quantity(500, "ml", "l") → 0.5
+        convert_quantity(33, "cl", "l") → 0.33
+        convert_quantity(1, "kg", "kg") → 1.0
+        convert_quantity(1, "piece", "piece") → 1.0
+
+    Returns qty unchanged if units are incompatible or unknown.
+    """
+    from_unit = from_unit.lower().strip()
+    to_unit = to_unit.lower().strip()
+
+    if from_unit == to_unit:
+        return qty
+
+    from_info = UNIT_TO_BASE.get(from_unit)
+    to_info = UNIT_TO_BASE.get(to_unit)
+
+    if from_info is None or to_info is None:
+        return qty  # Unknown unit, don't convert
+
+    from_base, from_factor = from_info
+    to_base, to_factor = to_info
+
+    if from_base != to_base:
+        return qty  # Incompatible (e.g., g vs l), don't convert
+
+    # Convert: qty in from_unit → base → to_unit
+    return qty * from_factor / to_factor
+
+
 def calculate_food_cost(
-    ingredients_with_prices: list[tuple[float, float | None]],
+    ingredients_with_prices: list[tuple[float, str, float | None, str]],
+    #                                 qty    ri_unit  price    ing_unit
     selling_price: float,
 ) -> tuple[float | None, float | None]:
-    """Calculate food cost for a recipe.
+    """Calculate food cost for a recipe with unit conversion.
 
     Args:
-        ingredients_with_prices: list of (quantity, unit_price) tuples.
+        ingredients_with_prices: list of (quantity, recipe_unit, unit_price, ingredient_unit).
         selling_price: the recipe selling price.
 
     Returns:
@@ -24,9 +75,10 @@ def calculate_food_cost(
     total = 0.0
     has_any_price = False
 
-    for quantity, unit_price in ingredients_with_prices:
+    for quantity, recipe_unit, unit_price, ingredient_unit in ingredients_with_prices:
         if unit_price is not None:
-            total += quantity * unit_price
+            converted_qty = convert_quantity(quantity, recipe_unit, ingredient_unit)
+            total += converted_qty * unit_price
             has_any_price = True
 
     if not has_any_price:
@@ -71,9 +123,9 @@ async def recalculate_recipe(db: AsyncSession, recipe_id: int) -> None:
         return
 
     if recipe.is_homemade:
-        # Homemade: sum of (quantity * unit_price) for all ingredients
+        # Homemade: sum of (quantity * unit_price) with unit conversion
         ingredients_with_prices = [
-            (ri.quantity, ri.ingredient.current_price)
+            (ri.quantity, ri.unit, ri.ingredient.current_price, ri.ingredient.unit)
             for ri in recipe.recipe_ingredients
         ]
         food_cost, food_cost_percent = calculate_food_cost(

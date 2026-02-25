@@ -118,7 +118,8 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 
 ## Key business logic
 
-- **Food cost %** = (sum of ingredient_qty × ingredient_price) / selling_price × 100
+- **Food cost %** = (sum of convert_quantity(qty, recipe_unit, ingredient_unit) × ingredient_price) / selling_price × 100
+- **Unit conversion:** `convert_quantity()` in costing.py handles g↔kg, ml↔cl↔l, piece/pce via `UNIT_TO_BASE` dict. Falls back to no conversion if units are incompatible or unknown.
 - When an ingredient price changes → recalculate ALL recipes using that ingredient
 - Margin thresholds: 🟢 <30% food cost, 🟠 30-35%, 🔴 >35% (configurable per restaurant)
 - Invoice matching: exact name → fuzzy (pg_trgm trigram) → suggest new ingredient
@@ -172,4 +173,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 28b — Batch recipe pre-fill (POST /ingredients/recipes-batch) + name-based fallback. RecipeLinker kept for ingredient change only. Previous: Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component, GET /ingredients/{id}/recipes), Sprint 25 (ingredient chips), Sprint 24 (delete confirmed invoices), Sprint 23 (MenuUploadZone, multi-recipe invoice lines, delete invoice, unlimited free plan). See @PLAN.md for original roadmap.
+Sprint 29 — Unit conversion in food cost calculation. `convert_quantity()` in costing.py converts between g/kg, ml/cl/l, piece/pce via `UNIT_TO_BASE` dict. `calculate_food_cost()` takes 4-tuples `(qty, recipe_unit, price, ingredient_unit)`. All callers updated: `_build_recipe_response`, `create_recipe`, `recalculate_recipe`, simulator `_build_state`. New `unit_cost_unit` field in `RecipeIngredientResponse` schema + frontend `RecipeDetail.tsx` shows `€/{unit_cost_unit}`. Previous: Sprint 28b (batch recipe pre-fill), Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component), Sprint 25 (ingredient chips), Sprint 24 (delete confirmed invoices), Sprint 23 (MenuUploadZone, multi-recipe invoice lines). See @PLAN.md for original roadmap.
