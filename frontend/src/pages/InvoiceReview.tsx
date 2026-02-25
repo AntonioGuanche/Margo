@@ -106,6 +106,7 @@ function LineRow({
 }) {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
   const handleSelectIngredient = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     if (value === '__create__') {
@@ -125,7 +126,6 @@ function LineRow({
     onChange({ create_ingredient_name: name || null });
   };
 
-  const matchedId = line.ingredient_id;
   const suggestionIds = new Set(line.suggestions.map((s) => s.id));
 
   return (
@@ -284,57 +284,117 @@ function LineRow({
         </div>
       </div>
 
-      {/* Ingredient match dropdown — only when not ignored */}
+      {/* Ingredient assignment — only when not ignored */}
       {!line.ignored && (
         <div className="space-y-2">
-          <select
-            value={
-              line.ignored
-                ? '__ignore__'
-                : line.create_ingredient_name
-                  ? '__create__'
-                  : line.ingredient_id?.toString() ?? ''
-            }
-            onChange={handleSelectIngredient}
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-          >
-            <option value="">Choisir un ingrédient...</option>
+          {line.ingredient_id || line.create_ingredient_name ? (
+            /* CHIP MODE — ingrédient assigné */
+            <>
+              <div className="flex items-center gap-2">
+                <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5 text-sm">
+                  <span className="text-orange-800 font-medium">
+                    {line.create_ingredient_name
+                      ? line.create_ingredient_name
+                      : allIngredients.find(i => i.id === line.ingredient_id)?.name ?? 'Ingrédient'}
+                  </span>
+                  {line.create_ingredient_name && (
+                    <span className="text-emerald-600 text-xs flex items-center gap-0.5">
+                      <Check size={12} />
+                      Sera créé
+                    </span>
+                  )}
+                  {!line.create_ingredient_name && line.ingredient_id && (() => {
+                    const suggestion = line.suggestions.find(s => s.id === line.ingredient_id);
+                    return suggestion ? (
+                      <span className="text-orange-500 text-xs">
+                        ({(suggestion.score * 100).toFixed(0)}%)
+                      </span>
+                    ) : null;
+                  })()}
+                  <button
+                    onClick={() => {
+                      setShowCreate(false);
+                      onChange({ ingredient_id: null, create_ingredient_name: null });
+                    }}
+                    className="text-stone-400 hover:text-red-500 transition-colors ml-1"
+                    title="Retirer l'association"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowDropdown(true)}
+                  className="text-xs text-stone-400 hover:text-orange-600"
+                >
+                  Changer
+                </button>
+              </div>
 
-            {/* Selected ingredient — always visible first if not in suggestions */}
-            {matchedId && !suggestionIds.has(matchedId) && (() => {
-              const matched = allIngredients.find(i => i.id === matchedId);
-              return matched ? (
-                <option key={matched.id} value={matched.id}>
-                  {matched.name}
-                </option>
-              ) : null;
-            })()}
-
-            {/* Suggestions from matching */}
-            {line.suggestions.length > 0 && (
-              <optgroup label="Suggestions">
-                {line.suggestions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({(s.score * 100).toFixed(0)}%)
-                  </option>
-                ))}
+              {/* Dropdown override quand on clique "Changer" */}
+              {showDropdown && (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    handleSelectIngredient(e);
+                    setShowDropdown(false);
+                  }}
+                  onBlur={() => setShowDropdown(false)}
+                  autoFocus
+                  className="w-full border border-orange-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                >
+                  <option value="">Choisir un autre ingrédient...</option>
+                  {line.suggestions.length > 0 && (
+                    <optgroup label="Suggestions">
+                      {line.suggestions.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({(s.score * 100).toFixed(0)}%)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="Tous les ingrédients">
+                    {allIngredients
+                      .filter((i) => !suggestionIds.has(i.id))
+                      .map((i) => (
+                        <option key={i.id} value={i.id}>
+                          {i.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <option value="__create__">+ Créer un nouvel ingrédient</option>
+                </select>
+              )}
+            </>
+          ) : (
+            /* DROPDOWN MODE — pas d'ingrédient assigné */
+            <select
+              value=""
+              onChange={handleSelectIngredient}
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            >
+              <option value="">Choisir un ingrédient...</option>
+              {line.suggestions.length > 0 && (
+                <optgroup label="Suggestions">
+                  {line.suggestions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({(s.score * 100).toFixed(0)}%)
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Tous les ingrédients">
+                {allIngredients
+                  .filter((i) => !suggestionIds.has(i.id))
+                  .map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name}
+                    </option>
+                  ))}
               </optgroup>
-            )}
-
-            {/* All ingredients not in suggestions */}
-            <optgroup label="Tous les ingrédients">
-              {allIngredients
-                .filter((i) => !suggestionIds.has(i.id) && i.id !== matchedId)
-                .map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name}
-                  </option>
-                ))}
-            </optgroup>
-
-            <option value="__create__">+ Créer un nouvel ingrédient</option>
-            <option value="__ignore__">Ignorer cette ligne</option>
-          </select>
+              <option value="__create__">+ Créer un nouvel ingrédient</option>
+              <option value="__ignore__">Ignorer cette ligne</option>
+            </select>
+          )}
 
           {/* Create new ingredient input */}
           {showCreate && (
