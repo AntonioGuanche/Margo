@@ -121,6 +121,11 @@ function RecipeLinker({
   const [newRecipeIsHomemade, setNewRecipeIsHomemade] = useState(false);
   const [autoSuggested, setAutoSuggested] = useState(false);
 
+  // Reset auto-suggestion flag when ingredient changes
+  useEffect(() => {
+    setAutoSuggested(false);
+  }, [ingredientId]);
+
   // Auto-fetch recipes that already use this ingredient
   const { data: existingRecipes } = useQuery<{ items: IngredientRecipeItem[] }>({
     queryKey: ['ingredient-recipes', ingredientId],
@@ -131,7 +136,7 @@ function RecipeLinker({
     enabled: !!ingredientId,
   });
 
-  // Auto-suggest on first render if ingredient has existing recipes
+  // Auto-suggest when ingredient has existing recipes and links are empty
   useEffect(() => {
     if (existingRecipes?.items && existingRecipes.items.length > 0 && recipeLinks.length === 0 && !autoSuggested) {
       setAutoSuggested(true);
@@ -145,7 +150,7 @@ function RecipeLinker({
         })),
       );
     }
-  }, [existingRecipes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [existingRecipes, autoSuggested]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function addRecipe(recipeId: number) {
     const recipe = recipesList.find((r) => r.id === recipeId);

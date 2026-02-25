@@ -172,4 +172,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 27 — Allow re-confirm, patch, and delete on confirmed invoices (removed all 3 status blocks). Previous: Sprint 26 (RecipeLinker chip component, GET /ingredients/{id}/recipes), Sprint 25 (ingredient chips), Sprint 24 (delete confirmed invoices), Sprint 23 (MenuUploadZone, multi-recipe invoice lines, delete invoice, unlimited free plan). See @PLAN.md for original roadmap.
+Sprint 28 — Fix RecipeLinker auto-suggestion reset when ingredient changes (autoSuggested flag reset on ingredientId change). Previous: Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component, GET /ingredients/{id}/recipes), Sprint 25 (ingredient chips), Sprint 24 (delete confirmed invoices), Sprint 23 (MenuUploadZone, multi-recipe invoice lines, delete invoice, unlimited free plan). See @PLAN.md for original roadmap.
