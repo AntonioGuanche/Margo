@@ -5,13 +5,8 @@ import { useRecipes, useDeleteRecipe, useDeleteAllRecipes } from '../hooks/useRe
 import { SkeletonList } from '../components/Skeleton';
 import ConfirmModal from '../components/ConfirmModal';
 import MenuUploadZone from '../components/MenuUploadZone';
+import { STATUS_COLORS } from '../utils/colors';
 import type { RecipeListItem } from '../hooks/useRecipes';
-
-const STATUS_COLORS = {
-  green: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  orange: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
-  red: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
-} as const;
 
 const CATEGORY_ORDER = ['entrée', 'plat', 'dessert', 'boisson', 'autre'];
 

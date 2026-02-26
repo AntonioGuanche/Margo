@@ -72,6 +72,7 @@ interface RecipeUpdate {
 export function useRecipes(search?: string, sortBy?: string, sortOrder?: string) {
   return useQuery({
     queryKey: ['recipes', search, sortBy, sortOrder],
+    staleTime: 5 * 60_000, // 5 min — lists change rarely
     queryFn: () => {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
@@ -145,6 +146,7 @@ export function useDeleteAllRecipes() {
 export function useDashboard() {
   return useQuery({
     queryKey: ['dashboard'],
+    staleTime: 2 * 60_000, // 2 min
     queryFn: () => apiClient<DashboardData>('/api/recipes/dashboard/overview'),
   });
 }

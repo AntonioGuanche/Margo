@@ -34,17 +34,28 @@ export default class ErrorBoundary extends Component<Props, State> {
             Oups, quelque chose a mal tourné
           </h2>
           <p className="text-sm text-stone-500 mb-6 max-w-xs">
-            Une erreur inattendue s'est produite. Essaie de recharger la page.
+            Une erreur inattendue s'est produite.
           </p>
-          <button
-            onClick={() => {
-              this.setState({ hasError: false });
-              window.location.reload();
-            }}
-            className="bg-orange-700 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-orange-800 transition-colors"
-          >
-            Recharger
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                this.setState({ hasError: false });
+                window.location.href = '/';
+              }}
+              className="bg-orange-700 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-orange-800 transition-colors"
+            >
+              Retour au dashboard
+            </button>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false });
+                window.location.reload();
+              }}
+              className="bg-stone-100 text-stone-700 px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-stone-200 transition-colors"
+            >
+              Recharger la page
+            </button>
+          </div>
         </div>
       );
     }

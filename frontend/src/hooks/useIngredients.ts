@@ -38,6 +38,7 @@ interface IngredientUpdate {
 export function useIngredients(search?: string) {
   return useQuery({
     queryKey: ['ingredients', search],
+    staleTime: 5 * 60_000, // 5 min — lists change rarely
     queryFn: () => {
       const params = new URLSearchParams();
       if (search) params.set('search', search);

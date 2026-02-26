@@ -40,6 +40,16 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       staleTime: 30_000,
+      networkMode: 'offlineFirst',
+    },
+    mutations: {
+      retry: (failureCount, error) => {
+        // Retry network errors up to 2 times, not 4xx/5xx
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+          return failureCount < 2;
+        }
+        return false;
+      },
     },
   },
 });

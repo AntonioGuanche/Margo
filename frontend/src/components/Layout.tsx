@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   UtensilsCrossed,
@@ -8,10 +9,12 @@ import {
   Bell,
   Settings,
   SlidersHorizontal,
+  WifiOff,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useInvoices } from '../hooks/useInvoices';
 import { useAlertCount } from '../hooks/useAlerts';
+import ErrorBoundary from './ErrorBoundary';
 
 /* ------------------------------------------------------------------ */
 /*  Sidebar link (desktop)                                             */
@@ -65,6 +68,27 @@ export default function Layout() {
   const { data: alertCount } = useAlertCount();
   const unreadAlerts = alertCount?.unread_count ?? 0;
 
+  // Offline detection
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Session expired modal
+  const [sessionExpired, setSessionExpired] = useState(false);
+  useEffect(() => {
+    const handler = () => setSessionExpired(true);
+    window.addEventListener('session-expired', handler);
+    return () => window.removeEventListener('session-expired', handler);
+  }, []);
+
   function handleLogout() {
     logout();
     navigate('/login');
@@ -112,6 +136,14 @@ export default function Layout() {
         </div>
       </header>
 
+      {/* Offline banner */}
+      {!isOnline && (
+        <div className="bg-red-500 text-white text-xs text-center py-1.5 font-medium flex items-center justify-center gap-1.5">
+          <WifiOff size={14} />
+          Pas de connexion internet
+        </div>
+      )}
+
       {/* ---- Body: sidebar (desktop) + content ---- */}
       <div className="flex flex-1">
         {/* Sidebar — desktop only */}
@@ -138,7 +170,9 @@ export default function Layout() {
 
         {/* Main content */}
         <main className="flex-1 p-4 pb-20 md:pb-6 max-w-4xl mx-auto w-full">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
 
@@ -198,6 +232,24 @@ export default function Layout() {
           <span>Simuler</span>
         </NavLink>
       </nav>
+
+      {/* Session expired modal */}
+      {sessionExpired && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full text-center space-y-4">
+            <p className="text-lg font-semibold text-stone-900">Session expirée</p>
+            <p className="text-sm text-stone-600">
+              Ta session a expiré. Reconnecte-toi pour continuer.
+            </p>
+            <button
+              onClick={() => { window.location.href = '/login'; }}
+              className="bg-orange-700 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-orange-800 transition-colors"
+            >
+              Se reconnecter
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

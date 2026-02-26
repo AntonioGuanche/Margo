@@ -1,0 +1,366 @@
+import { useState } from 'react';
+import {
+  AlertTriangle,
+  Check,
+  Trash2,
+  Undo2,
+  X,
+} from 'lucide-react';
+import ConfidenceBadge from './ConfidenceBadge';
+import RecipeLinker from './RecipeLinker';
+import type { LineState, IngredientItem } from '../types/invoice';
+
+export default function InvoiceLineCard({
+  line,
+  allIngredients,
+  recipesList,
+  onChange,
+}: {
+  line: LineState;
+  allIngredients: IngredientItem[];
+  recipesList: { id: number; name: string }[];
+  onChange: (updates: Partial<LineState>) => void;
+}) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const handleSelectIngredient = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    if (value === '__create__') {
+      setShowCreate(true);
+      setNewName(line.description);
+      onChange({ ingredient_id: null, create_ingredient_name: line.description, ignored: false });
+    } else if (value === '__ignore__') {
+      onChange({ ingredient_id: null, create_ingredient_name: null, ignored: true });
+    } else {
+      setShowCreate(false);
+      onChange({ ingredient_id: parseInt(value, 10), create_ingredient_name: null, ignored: false, recipe_links: [] });
+    }
+  };
+
+  const handleCreateName = (name: string) => {
+    setNewName(name);
+    onChange({ create_ingredient_name: name || null });
+  };
+
+  const suggestionIds = new Set(line.suggestions.map((s) => s.id));
+
+  return (
+    <div
+      className={`bg-white rounded-xl border ${
+        line.is_manual ? 'border-blue-200' : 'border-stone-200'
+      } p-4 ${line.ignored ? 'opacity-50' : ''}`}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2 flex-wrap sm:flex-nowrap mb-3">
+        <div className="flex-1 min-w-0">
+          {line.is_manual ? (
+            <input
+              type="text"
+              value={line.description}
+              onChange={(e) => onChange({ description: e.target.value })}
+              placeholder="Nom du produit"
+              className="font-medium text-stone-900 w-full bg-transparent border-b border-blue-200 focus:border-blue-500 focus:outline-none py-0.5"
+            />
+          ) : (
+            <p className="font-medium text-stone-900 truncate">{line.description}</p>
+          )}
+
+          {line.is_manual ? (
+            <div className="flex gap-2 mt-1.5">
+              <input
+                type="number"
+                value={line.quantity ?? ''}
+                onChange={(e) =>
+                  onChange({ quantity: e.target.value ? parseFloat(e.target.value) : null })
+                }
+                placeholder="Qté"
+                step="0.1"
+                className="w-20 border border-stone-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="text"
+                value={line.unit ?? ''}
+                onChange={(e) => onChange({ unit: e.target.value || null })}
+                placeholder="kg, L, pce..."
+                className="w-24 border border-stone-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="number"
+                value={line.unit_price ?? ''}
+                onChange={(e) =>
+                  onChange({ unit_price: e.target.value ? parseFloat(e.target.value) : null })
+                }
+                placeholder="Prix unit."
+                step="0.01"
+                className="w-24 border border-stone-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="self-center text-sm text-stone-400">€</span>
+            </div>
+          ) : (
+            <div className="flex gap-3 text-sm text-stone-500 mt-0.5">
+              {line.quantity != null && (
+                <span>
+                  {line.quantity} {line.unit ?? ''}
+                </span>
+              )}
+              {line.unit_price != null && <span>{line.unit_price.toFixed(2)} €/unité</span>}
+              {line.total_price != null && <span>Total: {line.total_price.toFixed(2)} €</span>}
+            </div>
+          )}
+
+          {/* Conversion conditionnement → unités */}
+          {!line.is_manual &&
+            line.units_per_package != null &&
+            line.units_per_package > 0 &&
+            line.quantity != null &&
+            line.quantity > 0 && (
+              <div className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-1 flex items-center gap-1">
+                <span>💡</span>
+                <span>
+                  {line.quantity} {line.unit ?? 'colis'} × {line.units_per_package} ={' '}
+                  {Math.round(line.quantity * line.units_per_package)} unités
+                  {line.total_price != null && (
+                    <>
+                      {' '}
+                      → {(line.total_price / (line.quantity * line.units_per_package)).toFixed(2)} €/unité
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
+
+          {/* Portion calculation from volume (kegs, BIB, bottles) */}
+          {!line.is_manual &&
+            line.volume_liters != null &&
+            line.suggested_portions != null &&
+            line.suggested_portions > 0 && (
+              <div className="text-xs bg-blue-50 rounded-lg px-2 py-1.5 mt-1 space-y-1">
+                <div className="flex items-center gap-1 text-blue-700">
+                  <span>🍺</span>
+                  <span>
+                    {line.volume_liters}L ÷ {line.suggested_serving_cl}cl
+                    = <strong>{line.suggested_portions} portions</strong>
+                    {line.price_per_portion != null && (
+                      <> → <strong>{line.price_per_portion.toFixed(2)} €/portion</strong></>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-blue-600">
+                  <span className="text-[10px]">Taille service :</span>
+                  <select
+                    value={line.suggested_serving_cl ?? 25}
+                    onChange={(e) => {
+                      const newCl = parseFloat(e.target.value);
+                      const newPortions = Math.floor((line.volume_liters! * 100) / newCl);
+                      const newPrice = line.total_price && newPortions > 0
+                        ? line.total_price / newPortions
+                        : null;
+                      onChange({
+                        suggested_serving_cl: newCl,
+                        suggested_portions: newPortions,
+                        price_per_portion: newPrice,
+                      });
+                    }}
+                    className="text-xs border border-blue-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  >
+                    <option value="25">25cl (bière)</option>
+                    <option value="33">33cl (bière)</option>
+                    <option value="50">50cl (pinte)</option>
+                    <option value="12.5">12.5cl (vin)</option>
+                    <option value="15">15cl (vin)</option>
+                    <option value="4">4cl (alcool)</option>
+                    <option value="2">2cl (shot)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <ConfidenceBadge confidence={line.match_confidence} />
+          {!line.ignored ? (
+            <button
+              onClick={() =>
+                onChange({ ignored: true, ingredient_id: null, create_ingredient_name: null })
+              }
+              className="p-1 text-stone-400 hover:text-red-600 transition-colors"
+              title="Ignorer cette ligne"
+            >
+              <Trash2 size={14} />
+            </button>
+          ) : (
+            <button
+              onClick={() => onChange({ ignored: false })}
+              className="p-1 text-stone-400 hover:text-orange-600 transition-colors"
+              title="Restaurer cette ligne"
+            >
+              <Undo2 size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Ingredient assignment — only when not ignored */}
+      {!line.ignored && (
+        <div className="space-y-2">
+          {/* No-match help banner */}
+          {!line.ingredient_id && !line.create_ingredient_name && (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2">
+              <AlertTriangle size={14} className="shrink-0" />
+              <span>Choisis un ingrédient ci-dessous pour mettre à jour son prix.</span>
+            </div>
+          )}
+
+          {line.ingredient_id || line.create_ingredient_name ? (
+            /* CHIP MODE — ingrédient assigné */
+            <>
+              <div className="flex items-center gap-2">
+                <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5 text-sm">
+                  <span className="text-orange-800 font-medium">
+                    {line.create_ingredient_name
+                      ? line.create_ingredient_name
+                      : allIngredients.find(i => i.id === line.ingredient_id)?.name ?? 'Ingrédient'}
+                  </span>
+                  {line.create_ingredient_name && (
+                    <span className="text-emerald-600 text-xs flex items-center gap-0.5">
+                      <Check size={12} />
+                      Sera créé
+                    </span>
+                  )}
+                  {!line.create_ingredient_name && line.ingredient_id && (() => {
+                    const suggestion = line.suggestions.find(s => s.id === line.ingredient_id);
+                    return suggestion ? (
+                      <span className="text-orange-500 text-xs">
+                        ({(suggestion.score * 100).toFixed(0)}%)
+                      </span>
+                    ) : null;
+                  })()}
+                  <button
+                    onClick={() => {
+                      setShowCreate(false);
+                      onChange({ ingredient_id: null, create_ingredient_name: null, recipe_links: [] });
+                    }}
+                    className="text-stone-400 hover:text-red-500 transition-colors ml-1"
+                    title="Retirer l'association"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowDropdown(true)}
+                  className="text-xs text-stone-400 hover:text-orange-600"
+                >
+                  Changer
+                </button>
+              </div>
+
+              {/* Dropdown override quand on clique "Changer" */}
+              {showDropdown && (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    handleSelectIngredient(e);
+                    setShowDropdown(false);
+                  }}
+                  onBlur={() => setShowDropdown(false)}
+                  autoFocus
+                  className="w-full border border-orange-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                >
+                  <option value="">Choisir un autre ingrédient...</option>
+                  {line.suggestions.length > 0 && (
+                    <optgroup label="Suggestions">
+                      {line.suggestions.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({(s.score * 100).toFixed(0)}%)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="Tous les ingrédients">
+                    {allIngredients
+                      .filter((i) => !suggestionIds.has(i.id))
+                      .map((i) => (
+                        <option key={i.id} value={i.id}>
+                          {i.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <option value="__create__">+ Créer un nouvel ingrédient</option>
+                </select>
+              )}
+            </>
+          ) : (
+            /* DROPDOWN MODE — pas d'ingrédient assigné */
+            <select
+              value=""
+              onChange={handleSelectIngredient}
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            >
+              <option value="">Choisir un ingrédient...</option>
+              {line.suggestions.length > 0 && (
+                <optgroup label="Suggestions">
+                  {line.suggestions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({(s.score * 100).toFixed(0)}%)
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Tous les ingrédients">
+                {allIngredients
+                  .filter((i) => !suggestionIds.has(i.id))
+                  .map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name}
+                    </option>
+                  ))}
+              </optgroup>
+              <option value="__create__">+ Créer un nouvel ingrédient</option>
+              <option value="__ignore__">Ignorer cette ligne</option>
+            </select>
+          )}
+
+          {/* Create new ingredient input */}
+          {showCreate && (
+            <div>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => handleCreateName(e.target.value)}
+                  placeholder="Nom du nouvel ingrédient"
+                  className="flex-1 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                {newName.trim() ? (
+                  <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium whitespace-nowrap">
+                    <Check size={14} />
+                    Sera créé
+                  </span>
+                ) : (
+                  <span className="text-xs text-stone-400 whitespace-nowrap">Entrez un nom</span>
+                )}
+              </div>
+              {newName.trim() && (
+                <p className="text-xs text-stone-400 mt-0.5">
+                  L'ingrédient sera créé automatiquement à la confirmation de la facture.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* RecipeLinker — multi-recipe chip system with auto-suggestion */}
+          {(line.ingredient_id || line.create_ingredient_name) && (
+            <RecipeLinker
+              ingredientId={line.ingredient_id}
+              recipeLinks={line.recipe_links}
+              recipesList={recipesList}
+              lineDescription={line.description}
+              onChange={(links) => onChange({ recipe_links: links })}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

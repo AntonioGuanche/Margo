@@ -108,6 +108,7 @@ export function useInvoices(status?: string, search?: string) {
 
   return useQuery<InvoiceListResponse>({
     queryKey: ['invoices', status, search],
+    staleTime: 60_000, // 1 min
     queryFn: () => apiClient<InvoiceListResponse>(`/api/invoices${qs ? `?${qs}` : ''}`),
   });
 }

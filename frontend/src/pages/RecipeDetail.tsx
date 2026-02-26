@@ -5,12 +5,7 @@ import { ArrowLeft, Pencil, Trash2, SlidersHorizontal } from 'lucide-react';
 import { useRecipe, useDeleteRecipe } from '../hooks/useRecipes';
 import ConfirmModal from '../components/ConfirmModal';
 import { SkeletonList } from '../components/Skeleton';
-
-const STATUS_COLORS = {
-  green: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-200' },
-  orange: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500', border: 'border-amber-200' },
-  red: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500', border: 'border-red-200' },
-} as const;
+import { STATUS_COLORS } from '../utils/colors';
 
 export default function RecipeDetail() {
   const { id } = useParams<{ id: string }>();

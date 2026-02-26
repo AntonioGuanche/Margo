@@ -19,16 +19,30 @@ export async function apiClient<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    // Network error (offline, DNS failure, etc.)
+    throw new Error('Pas de connexion internet. Vérifie ton réseau et réessaie.');
+  }
 
   if (response.status === 401) {
+    const wasAuthenticated = !!localStorage.getItem('token');
     localStorage.removeItem('token');
-    window.location.href = '/login';
-    throw new Error('Session expirée');
+
+    if (wasAuthenticated) {
+      // Session expired — dispatch event so Layout can show a modal
+      window.dispatchEvent(new CustomEvent('session-expired'));
+    } else {
+      window.location.href = '/login';
+    }
+
+    throw new Error('Session expirée — reconnecte-toi pour continuer.');
   }
 
   if (!response.ok) {
