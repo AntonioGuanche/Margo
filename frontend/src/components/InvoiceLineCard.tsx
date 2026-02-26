@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import ConfidenceBadge from './ConfidenceBadge';
 import RecipeLinker from './RecipeLinker';
-import type { LineState, IngredientItem } from '../types/invoice';
+import type { LineState, IngredientItem } from '../types';
 
 export default function InvoiceLineCard({
   line,

@@ -5,7 +5,7 @@ import { useAlertCount, useAlerts } from '../hooks/useAlerts';
 import { SkeletonDashboard } from '../components/Skeleton';
 import MenuUploadZone from '../components/MenuUploadZone';
 import { STATUS_COLORS, StatusBadge } from '../utils/colors';
-import type { RecipeListItem } from '../hooks/useRecipes';
+import type { RecipeListItem } from '../types';
 
 function RecipeRow({ recipe, onClickRecipe, onSimulate }: {
   recipe: RecipeListItem;

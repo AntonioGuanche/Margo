@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useIngredients } from '../hooks/useIngredients';
 import { useCreateRecipe, useUpdateRecipe, useRecipe } from '../hooks/useRecipes';
-import type { Ingredient } from '../hooks/useIngredients';
+import type { Ingredient } from '../types';
 
 interface IngredientLine {
   ingredient_id: number | null;

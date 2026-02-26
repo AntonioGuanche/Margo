@@ -7,7 +7,7 @@ import {
   useUpdateIngredient,
   useDeleteIngredient,
 } from '../hooks/useIngredients';
-import type { Ingredient, UnitType } from '../hooks/useIngredients';
+import type { Ingredient, UnitType } from '../types';
 import IngredientForm from '../components/IngredientForm';
 import PriceHistoryChart from '../components/PriceHistoryChart';
 import ConfirmModal from '../components/ConfirmModal';

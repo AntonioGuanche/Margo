@@ -1,27 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
+import type { AlertListResponse, AlertCountResponse } from '../types';
 
-export interface AlertItem {
-  id: number;
-  alert_type: string;
-  severity: string;
-  message: string;
-  details: Record<string, unknown> | null;
-  is_read: boolean;
-  ingredient_id: number | null;
-  recipe_id: number | null;
-  created_at: string;
-}
-
-interface AlertListResponse {
-  items: AlertItem[];
-  total: number;
-  unread_count: number;
-}
-
-interface AlertCountResponse {
-  unread_count: number;
-}
+// Re-export for consumers who import from hook
+export type { AlertItem } from '../types';
 
 export function useAlerts(isRead?: boolean, severity?: string) {
   return useQuery({

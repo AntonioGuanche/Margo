@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { SlidersHorizontal, Search, ChevronDown, ChevronRight } from 'lucide-react';
 import { useRecipes } from '../hooks/useRecipes';
 import { SkeletonList } from '../components/Skeleton';
-import type { RecipeListItem } from '../hooks/useRecipes';
+import type { RecipeListItem } from '../types';
 
 const STATUS_COLORS = {
   green: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },

@@ -6,7 +6,7 @@ import { SkeletonList } from '../components/Skeleton';
 import ConfirmModal from '../components/ConfirmModal';
 import MenuUploadZone from '../components/MenuUploadZone';
 import { STATUS_COLORS } from '../utils/colors';
-import type { RecipeListItem } from '../hooks/useRecipes';
+import type { RecipeListItem } from '../types';
 
 const CATEGORY_ORDER = ['entrée', 'plat', 'dessert', 'boisson', 'autre'];
 

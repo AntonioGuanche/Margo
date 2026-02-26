@@ -4,7 +4,7 @@ import { FileText, Plus, Clock, CheckCircle, Upload, Trash2, Search } from 'luci
 import { useInvoices, useDeleteInvoice } from '../hooks/useInvoices';
 import { SkeletonList } from '../components/Skeleton';
 import ConfirmModal from '../components/ConfirmModal';
-import type { InvoiceListItem } from '../hooks/useInvoices';
+import type { InvoiceListItem } from '../types';
 
 function StatusBadge({ status }: { status: string }) {
   if (status === 'confirmed') {

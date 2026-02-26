@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { Ingredient, UnitType } from '../hooks/useIngredients';
+import type { Ingredient, UnitType } from '../types';
 
 const UNITS: { value: UnitType; label: string }[] = [
   { value: 'kg', label: 'kg' },

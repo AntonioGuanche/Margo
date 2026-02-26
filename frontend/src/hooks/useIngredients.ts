@@ -1,39 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
+import type {
+  Ingredient,
+  IngredientListResponse,
+  IngredientCreateRequest,
+  IngredientUpdateRequest,
+  PriceHistoryResponse,
+} from '../types';
 
-export type UnitType = 'g' | 'kg' | 'cl' | 'l' | 'piece';
-
-export interface Ingredient {
-  id: number;
-  name: string;
-  unit: UnitType;
-  current_price: number | null;
-  supplier_name: string | null;
-  category: string | null;
-  last_updated: string | null;
-  created_at: string;
-}
-
-interface IngredientListResponse {
-  items: Ingredient[];
-  total: number;
-}
-
-interface IngredientCreate {
-  name: string;
-  unit: UnitType;
-  current_price?: number | null;
-  supplier_name?: string | null;
-  category?: string | null;
-}
-
-interface IngredientUpdate {
-  name?: string;
-  unit?: UnitType;
-  current_price?: number | null;
-  supplier_name?: string | null;
-  category?: string | null;
-}
+// Re-export for consumers who import from hook
+export type { Ingredient, UnitType, PriceHistoryEntry } from '../types';
 
 export function useIngredients(search?: string) {
   return useQuery({
@@ -52,7 +28,7 @@ export function useIngredients(search?: string) {
 export function useCreateIngredient() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: IngredientCreate) =>
+    mutationFn: (data: IngredientCreateRequest) =>
       apiClient<Ingredient>('/api/ingredients', {
         method: 'POST',
         body: data,
@@ -66,7 +42,7 @@ export function useCreateIngredient() {
 export function useUpdateIngredient() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: IngredientUpdate }) =>
+    mutationFn: ({ id, data }: { id: number; data: IngredientUpdateRequest }) =>
       apiClient<Ingredient>(`/api/ingredients/${id}`, {
         method: 'PUT',
         body: data,
@@ -88,22 +64,6 @@ export function useDeleteIngredient() {
       queryClient.invalidateQueries({ queryKey: ['ingredients'] });
     },
   });
-}
-
-// --- Price history ---
-
-export interface PriceHistoryEntry {
-  price: number;
-  date: string;
-  invoice_id: number | null;
-  supplier_name: string | null;
-  created_at: string;
-}
-
-interface PriceHistoryResponse {
-  ingredient_name: string;
-  current_price: number | null;
-  history: PriceHistoryEntry[];
 }
 
 export function usePriceHistory(ingredientId: number | undefined) {

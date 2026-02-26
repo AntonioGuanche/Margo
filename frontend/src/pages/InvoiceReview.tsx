@@ -16,8 +16,7 @@ import { useIngredients } from '../hooks/useIngredients';
 import { useRecipes } from '../hooks/useRecipes';
 import { apiClient } from '../api/client';
 import InvoiceLineCard from '../components/InvoiceLineCard';
-import type { InvoiceLineResponse } from '../hooks/useInvoices';
-import type { LineState, IngredientItem, IngredientRecipeItem } from '../types/invoice';
+import type { InvoiceLineResponse, LineState, IngredientItem, IngredientRecipeItem } from '../types';
 
 // --- Main page ---
 

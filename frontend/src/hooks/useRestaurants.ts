@@ -1,25 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
+import type { RestaurantInfo, RestaurantList, SwitchResponse } from '../types';
 
-interface RestaurantInfo {
-  id: number;
-  name: string;
-  owner_email: string;
-  plan: string;
-  default_target_margin: number;
-  parent_restaurant_id: number | null;
-}
-
-interface RestaurantList {
-  main: RestaurantInfo;
-  sub_restaurants: RestaurantInfo[];
-}
-
-interface SwitchResponse {
-  access_token: string;
-  restaurant_id: number;
-  restaurant_name: string;
-}
+// Re-export for consumers who import from hook
+export type { RestaurantInfo } from '../types';
 
 export function useRestaurants() {
   return useQuery<RestaurantList>({

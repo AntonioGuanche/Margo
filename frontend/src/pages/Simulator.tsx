@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, SlidersHorizontal, Check } from 'lucide-react';
 import { useRecipe } from '../hooks/useRecipes';
 import { useSimulate, useApplySimulation } from '../hooks/useSimulator';
-import type { SimulateResponse } from '../hooks/useSimulator';
+import type { SimulateResponse } from '../types';
 
 const STATUS_COLORS = {
   green: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-200', label: 'OK' },

@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Bell, CheckCheck, TrendingUp, ChefHat, PartyPopper } from 'lucide-react';
 import { useAlerts, useMarkAlertRead, useMarkAllRead } from '../hooks/useAlerts';
 import { SkeletonList } from '../components/Skeleton';
-import type { AlertItem } from '../hooks/useAlerts';
+import type { AlertItem } from '../types';
 
 function timeAgo(dateStr: string): string {
   const now = new Date();

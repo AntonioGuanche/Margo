@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, Plus, X } from 'lucide-react';
 import { apiClient } from '../api/client';
-import type { RecipeLinkState, IngredientRecipeItem } from '../types/invoice';
+import type { RecipeLinkState, IngredientRecipeItem } from '../types';
 
 const CATEGORIES = ['entrée', 'plat', 'dessert', 'boisson', 'autre'];
 
