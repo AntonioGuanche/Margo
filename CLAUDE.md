@@ -27,7 +27,7 @@ margo/
 │   ├── app/
 │   │   ├── config.py          # pydantic-settings, env vars
 │   │   ├── database.py        # async engine, sessionmaker, get_db dependency
-│   │   ├── dependencies.py    # get_current_restaurant from JWT
+│   │   ├── dependencies.py    # get_current_restaurant + get_admin from JWT
 │   │   ├── models/            # SQLAlchemy ORM models
 │   │   ├── schemas/           # Pydantic request/response schemas
 │   │   ├── routers/           # API route modules
@@ -36,6 +36,7 @@ margo/
 │   │   │   ├── recipes.py     # CRUD + food cost calculation + DELETE /all
 │   │   │   ├── invoices.py    # upload, review, confirm, portion calc
 │   │   │   ├── onboarding.py  # AI menu extraction + batch creation
+│   │   │   ├── admin.py       # founder admin: stats, users, plan editing, normalize
 │   │   │   ├── billing.py     # Stripe checkout, portal, plan info
 │   │   │   ├── dashboard.py   # KPIs + alerts
 │   │   │   └── simulator.py   # what-if price changes
@@ -68,7 +69,8 @@ margo/
 │   │   │   ├── InvoiceUpload.tsx
 │   │   │   ├── InvoiceReview.tsx # line matching + recipe creation + portions
 │   │   │   ├── Dashboard.tsx
-│   │   │   └── Settings.tsx
+│   │   │   ├── Settings.tsx
+│   │   │   └── Admin.tsx      # founder admin page: stats + user table + plan editing
 │   │   ├── types/             # Shared TS types (mirror of Pydantic schemas)
 │   │   │   ├── index.ts       # Re-export all
 │   │   │   ├── ingredient.ts  # Ingredient, UnitType, IngredientListResponse…
@@ -76,13 +78,15 @@ margo/
 │   │   │   ├── invoice.ts     # InvoiceListItem, LineState, InvoiceConfirmLine…
 │   │   │   ├── alert.ts       # AlertItem, AlertListResponse
 │   │   │   ├── restaurant.ts  # RestaurantInfo, RestaurantList
-│   │   │   └── simulator.ts   # SimulateResponse, SimulationState
+│   │   │   ├── simulator.ts   # SimulateResponse, SimulationState
+│   │   │   └── admin.ts       # AdminStats, AdminUser, NormalizeUnitsResponse
 │   │   ├── hooks/
 │   │   │   ├── useRecipes.ts  # CRUD + useDeleteRecipe + useDeleteAllRecipes
 │   │   │   ├── useIngredients.ts
 │   │   │   ├── useInvoices.ts  # includes portion/volume fields
 │   │   │   ├── useOnboarding.ts # useExtractMenu, useSuggestIngredients, useConfirmOnboarding
-│   │   │   └── useBilling.ts
+│   │   │   ├── useBilling.ts
+│   │   │   └── useAdmin.ts    # useAdminCheck, useAdminStats, useAdminUsers, useUpdateUserPlan, useNormalizeUnits
 │   │   └── api/
 │   │       └── client.ts      # fetch wrapper with JWT header injection
 │   ├── public/
@@ -97,7 +101,7 @@ margo/
 - `cd backend && uvicorn main:app --reload` — run backend locally
 - `cd backend && alembic upgrade head` — apply DB migrations
 - `cd backend && alembic revision --autogenerate -m "description"` — create migration
-- `cd backend && pytest` — run all backend tests (123 tests, ~15min on remote DB)
+- `cd backend && pytest` — run all backend tests (129 tests, ~15min on remote DB)
 - `cd backend && pytest tests/test_recipes.py -v` — run specific test file
 - `cd frontend && npm run dev` — run frontend locally
 - `cd frontend && npm run build` — build frontend for production
@@ -151,7 +155,8 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - **RecipeLinker:** Chip-based multi-recipe component in InvoiceReview. Auto-fetches existing recipe links via GET `/api/ingredients/{id}/recipes` and pre-fills chips. Users can add/remove recipes, adjust quantity/unit per chip.
 - **MenuUploadZone:** Shared component (components/MenuUploadZone.tsx) used in Dashboard empty state and Recipes page. Supports drag&drop, multi-file sequential extraction with progress, camera, optional manual add button.
 - **€ symbol:** Price input in StepDishes uses absolute-positioned € suffix (not in placeholder)
-- **Shared types:** `frontend/src/types/` directory with 7 files mirroring Pydantic schemas (ingredient.ts, recipe.ts, invoice.ts, alert.ts, restaurant.ts, simulator.ts, index.ts). All hooks import from `types/`, re-export key types for backward compatibility. Pages import types from `../types` directly. Convention: `*Response` for API responses, `*Request` for requests, `*State` for frontend state.
+- **Shared types:** `frontend/src/types/` directory with 8 files mirroring Pydantic schemas (ingredient.ts, recipe.ts, invoice.ts, alert.ts, restaurant.ts, simulator.ts, admin.ts, index.ts). All hooks import from `types/`, re-export key types for backward compatibility. Pages import types from `../types` directly. Convention: `*Response` for API responses, `*Request` for requests, `*State` for frontend state.
+- **Admin access:** `ADMIN_EMAILS` env var (comma-separated). `get_admin` dependency in `dependencies.py` checks `restaurant.owner_email` against admin list. Frontend uses `GET /admin/check` (useAdminCheck hook) to conditionally show admin sidebar link (Shield icon). Admin router at `/admin` prefix with 5 endpoints: check, stats, users, update plan, normalize-units per restaurant.
 
 ## IMPORTANT rules
 
@@ -173,7 +178,7 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 
 ## Environment variables
 
-See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY, R2_*, RESEND_API_KEY, STRIPE_*, FRONTEND_URL, ENVIRONMENT
+See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY, R2_*, RESEND_API_KEY, STRIPE_*, FRONTEND_URL, ENVIRONMENT, ADMIN_EMAILS
 
 ## Domain
 
@@ -183,4 +188,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 34 — Normalisation unités base. `normalize_to_base_unit()` dans costing.py : g→kg, cl→l, ml→l automatiquement. Appliqué aux 5 points d'entrée (ingredients POST/PUT, invoices confirm new/update, onboarding). Script migration `scripts/normalize_units.py` pour corriger données existantes + recalcul recettes. 14 nouveaux tests (test_normalize.py). Frontend : note "converti en €/kg" dans IngredientForm. Invariant : `ingredient.unit` est TOUJOURS kg/l/piece. Previous: Sprint 33 (P4 types partagés), Sprint 32 (P3 fiabilité), Sprint 31 (P2 navigation), Sprint 30 (hardening P0+P1), Sprint 29b (unit sync on confirm), Sprint 29 (unit conversion), Sprint 28b (batch recipe pre-fill), Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component), Sprint 25 (ingredient chips). See @PLAN.md for original roadmap.
+Sprint 35 — Page Admin fondateur. Router `/admin` avec 5 endpoints (check, stats, users, patch plan, normalize-units par restaurant). Dependency `get_admin` vérifie `ADMIN_EMAILS` env var. Frontend : page Admin.tsx avec stats globales (grille 4 cards) + tableau utilisateurs (plan éditable inline, bouton normaliser). Lien conditionnel dans Layout sidebar (icône Shield) via `GET /admin/check`. Suppression de l'endpoint temporaire `/admin/normalize-units` du Sprint 34 dans main.py. Previous: Sprint 34 (normalisation unités), Sprint 33 (P4 types partagés), Sprint 32 (P3 fiabilité), Sprint 31 (P2 navigation), Sprint 30 (hardening P0+P1), Sprint 29b (unit sync on confirm), Sprint 29 (unit conversion), Sprint 28b (batch recipe pre-fill), Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component), Sprint 25 (ingredient chips). See @PLAN.md for original roadmap.
