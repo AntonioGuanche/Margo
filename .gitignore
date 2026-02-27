@@ -36,3 +36,11 @@ htmlcov/
 
 # Claude Code local
 CLAUDE.local.md
+.claude/
+
+# Local uploads (dev only)
+backend/uploads/
+
+# Archives
+*.zip
+nul

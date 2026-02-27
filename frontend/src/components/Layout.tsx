@@ -10,10 +10,12 @@ import {
   Settings,
   SlidersHorizontal,
   WifiOff,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useInvoices } from '../hooks/useInvoices';
 import { useAlertCount } from '../hooks/useAlerts';
+import { useAdminCheck } from '../hooks/useAdmin';
 import ErrorBoundary from './ErrorBoundary';
 
 /* ------------------------------------------------------------------ */
@@ -67,6 +69,8 @@ export default function Layout() {
   const pendingCount = invoicesData?.total ?? 0;
   const { data: alertCount } = useAlertCount();
   const unreadAlerts = alertCount?.unread_count ?? 0;
+  const { data: adminCheck } = useAdminCheck();
+  const isAdmin = adminCheck?.is_admin === true;
 
   // Offline detection
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -162,9 +166,12 @@ export default function Layout() {
             <SidebarLink to="/alerts" icon={Bell} label="Alertes" badge={unreadAlerts} />
           </nav>
 
-          {/* Settings pinned to bottom */}
+          {/* Settings + Admin pinned to bottom */}
           <div className="border-t border-stone-200 pt-2 mt-2">
             <SidebarLink to="/settings" icon={Settings} label="Paramètres" />
+            {isAdmin && (
+              <SidebarLink to="/admin" icon={Shield} label="Admin" />
+            )}
           </div>
         </aside>
 

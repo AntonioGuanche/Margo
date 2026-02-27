@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.models.restaurant import Restaurant
 from app.services.auth import decode_access_token
@@ -36,4 +37,26 @@ async def get_current_restaurant(
             detail="Restaurant introuvable",
         )
 
+    return restaurant
+
+
+async def get_admin(
+    restaurant: Restaurant = Depends(get_current_restaurant),
+) -> Restaurant:
+    """Require the authenticated restaurant owner to be an admin.
+
+    Checks that ``restaurant.owner_email`` is listed in the
+    ``ADMIN_EMAILS`` environment variable. Returns the restaurant
+    if authorised, raises 403 otherwise.
+    """
+    admin_list = [
+        e.strip().lower()
+        for e in settings.admin_emails.split(",")
+        if e.strip()
+    ]
+    if restaurant.owner_email.lower() not in admin_list:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès admin requis",
+        )
     return restaurant

@@ -34,7 +34,7 @@ router = APIRouter()
 async def list_ingredients(
     search: str | None = Query(default=None, max_length=255),
     skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=500),
     restaurant: Restaurant = Depends(get_current_restaurant),
     db: AsyncSession = Depends(get_db),
 ) -> IngredientListResponse:

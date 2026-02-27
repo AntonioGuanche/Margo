@@ -86,7 +86,7 @@ def _build_recipe_response(recipe: Recipe) -> RecipeResponse:
 async def list_recipes(
     search: str | None = Query(default=None, max_length=255),
     skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=500),
     sort_by: str = Query(default="name", pattern="^(name|food_cost_percent)$"),
     sort_order: str = Query(default="asc", pattern="^(asc|desc)$"),
     restaurant: Restaurant = Depends(get_current_restaurant),

@@ -22,6 +22,7 @@ import Simulator from './pages/Simulator';
 import SimulatorHome from './pages/SimulatorHome';
 import Pricing from './pages/Pricing';
 import Settings from './pages/Settings';
+import Admin from './pages/Admin';
 
 function NotFound() {
   return (
@@ -89,6 +90,7 @@ export default function App() {
             <Route path="/invoices/:id/review" element={<InvoiceReview />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
           </Route>
 

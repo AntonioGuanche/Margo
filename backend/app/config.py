@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     stripe_price_pro: str = ""
     stripe_price_multi: str = ""
 
+    # --- Admin ---
+    admin_emails: str = ""  # comma-separated, e.g. "antonio@heymargo.be,autre@email.com"
+
     # --- App ---
     frontend_url: str = "http://localhost:5173"
     environment: str = "development"
