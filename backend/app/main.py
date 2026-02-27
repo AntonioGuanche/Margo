@@ -105,6 +105,68 @@ async def health_check() -> HealthResponse:
     )
 
 
+# --- One-shot migration: normalize ingredient units --- Remove after migration
+from fastapi import Depends
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_db
+from app.dependencies import get_current_restaurant
+from app.models.ingredient import Ingredient
+from app.models.recipe import Recipe
+from app.models.restaurant import Restaurant
+from app.services.costing import normalize_to_base_unit, recalculate_recipe
+
+
+@app.post("/admin/normalize-units")
+async def normalize_units(
+    restaurant: Restaurant = Depends(get_current_restaurant),
+    db: AsyncSession = Depends(get_db),
+):
+    """Normalize all ingredient units to base (kg, l, piece) and recalculate recipes."""
+    # Fetch all ingredients for this restaurant
+    result = await db.execute(
+        select(Ingredient).where(Ingredient.restaurant_id == restaurant.id)
+    )
+    ingredients = result.scalars().all()
+
+    details = []
+    ingredients_fixed = 0
+
+    for ing in ingredients:
+        base_unit, base_price = normalize_to_base_unit(ing.unit, ing.current_price)
+        if base_unit != ing.unit or base_price != ing.current_price:
+            details.append({
+                "name": ing.name,
+                "old_unit": ing.unit,
+                "old_price": ing.current_price,
+                "new_unit": base_unit,
+                "new_price": base_price,
+            })
+            ing.unit = base_unit
+            ing.current_price = base_price
+            ingredients_fixed += 1
+
+    await db.flush()
+
+    # Recalculate ALL recipes for this restaurant
+    recipe_result = await db.execute(
+        select(Recipe.id).where(Recipe.restaurant_id == restaurant.id)
+    )
+    recipe_ids = recipe_result.scalars().all()
+
+    for rid in recipe_ids:
+        await recalculate_recipe(db, rid)
+
+    await db.flush()
+
+    return {
+        "ingredients_fixed": ingredients_fixed,
+        "ingredients_total": len(ingredients),
+        "recipes_recalculated": len(recipe_ids),
+        "details": details,
+    }
+
+
 # --- Serve frontend SPA (built React app) ---
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
