@@ -151,7 +151,7 @@ export default function Layout() {
       {/* ---- Body: sidebar (desktop) + content ---- */}
       <div className="flex flex-1">
         {/* Sidebar — desktop only */}
-        <aside className="hidden md:flex md:flex-col md:w-[220px] bg-white border-r border-stone-200 p-3 shrink-0">
+        <aside className="hidden md:flex md:flex-col md:w-[220px] bg-white border-r border-stone-200 p-3 shrink-0 sticky top-0 h-screen overflow-y-auto">
           <nav className="flex flex-col gap-1 flex-1">
             <SidebarLink to="/" icon={LayoutDashboard} label="Dashboard" end />
             <SidebarLink to="/recipes" icon={BookOpen} label="Ma carte" />

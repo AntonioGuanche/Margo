@@ -5,6 +5,7 @@ import type {
   AdminUsersResponse,
   AdminCheckResponse,
   NormalizeUnitsResponse,
+  FixInflatedPricesResponse,
 } from '../types';
 
 export function useAdminCheck() {
@@ -49,6 +50,16 @@ export function useNormalizeUnits() {
     mutationFn: (restaurantId: number) =>
       apiClient<NormalizeUnitsResponse>(
         `/admin/users/${restaurantId}/normalize-units`,
+        { method: 'POST' },
+      ),
+  });
+}
+
+export function useFixInflatedPrices() {
+  return useMutation({
+    mutationFn: (restaurantId: number) =>
+      apiClient<FixInflatedPricesResponse>(
+        `/admin/users/${restaurantId}/fix-inflated-prices`,
         { method: 'POST' },
       ),
   });

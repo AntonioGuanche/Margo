@@ -182,6 +182,85 @@ async def admin_update_user(
     }
 
 
+@router.post("/users/{restaurant_id}/fix-inflated-prices")
+async def admin_fix_inflated_prices(
+    restaurant_id: int,
+    admin: Restaurant = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Fix prices over-inflated by the normalize migration.
+
+    For each ingredient whose price exceeds reasonable thresholds for a Belgian
+    restaurant, try dividing by 1000 (undo g→kg or ml→l) then by 100 (undo
+    cl→l) until a candidate within the threshold is found.
+    """
+    # Verify target restaurant exists
+    target = await db.get(Restaurant, restaurant_id)
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant introuvable",
+        )
+
+    MAX_REASONABLE: dict[str, float] = {"kg": 500.0, "l": 200.0, "piece": 100.0}
+
+    result = await db.execute(
+        select(Ingredient).where(Ingredient.restaurant_id == restaurant_id)
+    )
+    ingredients = result.scalars().all()
+
+    fixes = []
+    for ing in ingredients:
+        if ing.current_price is None:
+            continue
+        max_price = MAX_REASONABLE.get(ing.unit)
+        if max_price is None or ing.current_price <= max_price:
+            continue
+
+        old_price = ing.current_price
+        new_price = None
+
+        # Try ÷1000 (undo g→kg or ml→l)
+        candidate = round(old_price / 1000, 6)
+        if 0.01 <= candidate <= max_price:
+            new_price = candidate
+        else:
+            # Try ÷100 (undo cl→l)
+            candidate = round(old_price / 100, 6)
+            if 0.01 <= candidate <= max_price:
+                new_price = candidate
+
+        if new_price is not None:
+            fixes.append(
+                {
+                    "name": ing.name,
+                    "unit": ing.unit,
+                    "old_price": old_price,
+                    "new_price": new_price,
+                }
+            )
+            ing.current_price = new_price
+
+    await db.flush()
+
+    # Recalculate all recipes for this restaurant
+    recipe_result = await db.execute(
+        select(Recipe.id).where(Recipe.restaurant_id == restaurant_id)
+    )
+    recipe_ids = recipe_result.scalars().all()
+    for rid in recipe_ids:
+        await recalculate_recipe(db, rid)
+
+    await db.flush()
+
+    return {
+        "prices_fixed": len(fixes),
+        "ingredients_total": len(ingredients),
+        "recipes_recalculated": len(recipe_ids),
+        "details": fixes,
+    }
+
+
 @router.post("/users/{restaurant_id}/normalize-units")
 async def admin_normalize_units(
     restaurant_id: int,
