@@ -55,7 +55,7 @@ margo/
 │   │       └── rate_limit.py  # AI + upload rate limiting
 │   ├── alembic/               # DB migrations
 │   ├── scripts/start.sh       # Alembic upgrade + uvicorn launch
-│   ├── tests/                 # pytest + httpx (126 tests)
+│   ├── tests/                 # pytest + httpx (154 tests)
 │   ├── Dockerfile
 │   └── pyproject.toml
 ├── frontend/
@@ -101,7 +101,7 @@ margo/
 - `cd backend && uvicorn main:app --reload` — run backend locally
 - `cd backend && alembic upgrade head` — apply DB migrations
 - `cd backend && alembic revision --autogenerate -m "description"` — create migration
-- `cd backend && pytest` — run all backend tests (129 tests, ~15min on remote DB)
+- `cd backend && pytest` — run all backend tests (154 tests, ~15min on remote DB)
 - `cd backend && pytest tests/test_recipes.py -v` — run specific test file
 - `cd frontend && npm run dev` — run frontend locally
 - `cd frontend && npm run build` — build frontend for production
@@ -188,4 +188,14 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 35 — Page Admin fondateur. Router `/admin` avec 5 endpoints (check, stats, users, patch plan, normalize-units par restaurant). Dependency `get_admin` vérifie `ADMIN_EMAILS` env var. Frontend : page Admin.tsx avec stats globales (grille 4 cards) + tableau utilisateurs (plan éditable inline, bouton normaliser). Lien conditionnel dans Layout sidebar (icône Shield) via `GET /admin/check`. Suppression de l'endpoint temporaire `/admin/normalize-units` du Sprint 34 dans main.py. Previous: Sprint 34 (normalisation unités), Sprint 33 (P4 types partagés), Sprint 32 (P3 fiabilité), Sprint 31 (P2 navigation), Sprint 30 (hardening P0+P1), Sprint 29b (unit sync on confirm), Sprint 29 (unit conversion), Sprint 28b (batch recipe pre-fill), Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component), Sprint 25 (ingredient chips). See @PLAN.md for original roadmap.
+Sprint 36 complete — Fix données corrompues + sidebar sticky.
+- `POST /admin/users/{id}/fix-inflated-prices` : corrige les prix sur-gonflés par la migration Sprint 34 (÷1000 ou ÷100 jusqu'à seuil raisonnable kg≤500€, l≤200€, piece≤100€), recalcule les recettes. Bouton "Fix prix" (icône Wrench) dans Admin.tsx (desktop row + mobile card).
+- Sidebar desktop rendue sticky : `sticky top-0 h-screen overflow-y-auto` sur `<aside>`.
+- `FixInflatedPricesResponse` type + `useFixInflatedPrices()` hook.
+
+### ⚠️ À faire après déploiement
+
+Appuyer sur le bouton "Fix prix" dans la page Admin pour chaque restaurant affecté. Vérifier que le dashboard revient à des % normaux (< 100% food cost).
+
+### Sprint history
+Previous: Sprint 35 (admin panel + query limit 500), Sprint 34 (normalisation unités — migration exécutée avec sur-inflation), Sprint 33 (P4 types partagés), Sprint 32 (P3 fiabilité), Sprint 31 (P2 navigation), Sprint 30 (hardening P0+P1), Sprint 29b (unit sync on confirm), Sprint 29 (unit conversion), Sprint 28b (batch recipe pre-fill), Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component), Sprint 25 (ingredient chips). See @PLAN.md for original roadmap.
