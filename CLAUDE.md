@@ -69,6 +69,14 @@ margo/
 │   │   │   ├── InvoiceReview.tsx # line matching + recipe creation + portions
 │   │   │   ├── Dashboard.tsx
 │   │   │   └── Settings.tsx
+│   │   ├── types/             # Shared TS types (mirror of Pydantic schemas)
+│   │   │   ├── index.ts       # Re-export all
+│   │   │   ├── ingredient.ts  # Ingredient, UnitType, IngredientListResponse…
+│   │   │   ├── recipe.ts      # RecipeListItem, RecipeDetail, DashboardResponse…
+│   │   │   ├── invoice.ts     # InvoiceListItem, LineState, InvoiceConfirmLine…
+│   │   │   ├── alert.ts       # AlertItem, AlertListResponse
+│   │   │   ├── restaurant.ts  # RestaurantInfo, RestaurantList
+│   │   │   └── simulator.ts   # SimulateResponse, SimulationState
 │   │   ├── hooks/
 │   │   │   ├── useRecipes.ts  # CRUD + useDeleteRecipe + useDeleteAllRecipes
 │   │   │   ├── useIngredients.ts
@@ -142,6 +150,7 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - **RecipeLinker:** Chip-based multi-recipe component in InvoiceReview. Auto-fetches existing recipe links via GET `/api/ingredients/{id}/recipes` and pre-fills chips. Users can add/remove recipes, adjust quantity/unit per chip.
 - **MenuUploadZone:** Shared component (components/MenuUploadZone.tsx) used in Dashboard empty state and Recipes page. Supports drag&drop, multi-file sequential extraction with progress, camera, optional manual add button.
 - **€ symbol:** Price input in StepDishes uses absolute-positioned € suffix (not in placeholder)
+- **Shared types:** `frontend/src/types/` directory with 7 files mirroring Pydantic schemas (ingredient.ts, recipe.ts, invoice.ts, alert.ts, restaurant.ts, simulator.ts, index.ts). All hooks import from `types/`, re-export key types for backward compatibility. Pages import types from `../types` directly. Convention: `*Response` for API responses, `*Request` for requests, `*State` for frontend state.
 
 ## IMPORTANT rules
 
@@ -173,4 +182,4 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 32 — P3 Fiabilité & Maintenabilité. (T1) Gestion réseau/offline: QueryClient `networkMode: 'offlineFirst'` + mutation retry on network errors, apiClient wraps fetch in try/catch for "Pas de connexion internet" message, offline banner in Layout (WifiOff icon). (T2) Session expirée: apiClient dispatches `CustomEvent('session-expired')` instead of brutal redirect, Layout shows modal "Session expirée" with reconnect button. (T3) ErrorBoundary: 2 buttons "Retour au dashboard" + "Recharger la page", Layout wraps `<Outlet />` in ErrorBoundary. (T4) staleTime: 5 min for recipes/ingredients lists, 2 min dashboard, 1 min invoices, 30 sec default for detail views. (T5) STATUS_COLORS + StatusBadge extracted to `utils/colors.tsx`, imported in Dashboard/Recipes/RecipeDetail. (T6) InvoiceReview split: `ConfidenceBadge.tsx`, `RecipeLinker.tsx`, `InvoiceLineCard.tsx` extracted as components, shared types in `types/invoice.ts`, InvoiceReview.tsx reduced from ~1200 to ~490 lines. Previous: Sprint 31 (P2 navigation), Sprint 30 (hardening P0+P1), Sprint 29b (unit sync on confirm), Sprint 29 (unit conversion), Sprint 28b (batch recipe pre-fill), Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component), Sprint 25 (ingredient chips). See @PLAN.md for original roadmap.
+Sprint 33 — P4 Types partagés. Centralisé tous les types frontend dans `types/` (7 fichiers miroir des schemas Pydantic). Migré 6 hooks (useRecipes, useIngredients, useInvoices, useAlerts, useSimulator, useRestaurants) : suppression des interfaces locales, import depuis `types/`, re-export des types clés. Mis à jour 10 pages/composants pour importer directement depuis `types/`. Résultat : -322 lignes de duplication, source unique de vérité pour les types. Previous: Sprint 32 (P3 fiabilité), Sprint 31 (P2 navigation), Sprint 30 (hardening P0+P1), Sprint 29b (unit sync on confirm), Sprint 29 (unit conversion), Sprint 28b (batch recipe pre-fill), Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component), Sprint 25 (ingredient chips). See @PLAN.md for original roadmap.
