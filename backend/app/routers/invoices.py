@@ -29,7 +29,7 @@ from app.schemas.invoice import (
     InvoiceUploadResponse,
 )
 from app.services.alerts import check_and_create_alerts
-from app.services.costing import convert_quantity, recalculate_recipes_for_ingredient
+from app.services.costing import UNIT_TO_BASE, normalize_to_base_unit, recalculate_recipes_for_ingredient
 from app.services.invoice_router import parse_invoice_file
 from app.services.matching import match_invoice_lines, save_alias
 from app.services.unit_parser import (
@@ -349,11 +349,13 @@ async def confirm_invoice(
 
         # Create new ingredient if requested
         if line.create_ingredient_name:
+            raw_unit = line.unit or "kg"
+            base_unit, base_price = normalize_to_base_unit(raw_unit, line.unit_price)
             new_ingredient = Ingredient(
                 restaurant_id=restaurant.id,
                 name=line.create_ingredient_name,
-                unit=line.unit or "kg",
-                current_price=line.unit_price,
+                unit=base_unit,
+                current_price=base_price,
                 supplier_name=invoice.supplier_name,
                 category=guess_ingredient_category(line.create_ingredient_name),
                 last_updated=dt.datetime.utcnow(),
@@ -379,15 +381,10 @@ async def confirm_invoice(
             ingredient = ing_result.scalar_one_or_none()
             if ingredient:
                 old_price = ingredient.current_price
-                # Normalize price to ingredient's stored unit
+                # Normalize line price to base unit using normalize_to_base_unit
                 new_price = line.unit_price
                 if new_price is not None and line.unit:
-                    line_unit = line.unit.lower()
-                    ing_unit = ingredient.unit.lower()
-                    if line_unit != ing_unit:
-                        factor = convert_quantity(1, ing_unit, line_unit)
-                        if factor != 1.0:
-                            new_price = round(new_price * factor, 6)
+                    _, new_price = normalize_to_base_unit(line.unit, new_price)
                 ingredient.current_price = new_price
                 ingredient.last_updated = dt.datetime.utcnow()
                 if invoice.supplier_name:

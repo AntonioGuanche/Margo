@@ -572,19 +572,19 @@ async def test_confirm_same_unit_no_normalization(
 async def test_confirm_price_normalization_fixes_food_cost(
     client, auth_headers, db_session, restaurant, xml_file_path
 ):
-    """Full scenario: ingredient in g + recipe 80g → confirm with kg price → food cost correct."""
-    # Ingredient stored in "g" (from onboarding)
+    """Full scenario: ingredient in kg (base unit) + recipe 80g → confirm with kg price → food cost correct."""
+    # Ingredient stored in "kg" (base unit — all ingredients are in base unit after Sprint 34)
     ingredient = Ingredient(
         restaurant_id=restaurant.id,
         name="Fromage belge",
-        unit="g",
+        unit="kg",
         current_price=None,
     )
     db_session.add(ingredient)
     await db_session.flush()
     await db_session.refresh(ingredient)
 
-    # Recipe using 80g
+    # Recipe using 80g (chef's unit)
     recipe = Recipe(
         restaurant_id=restaurant.id,
         name="Portion de Fromage",
@@ -604,12 +604,9 @@ async def test_confirm_price_normalization_fixes_food_cost(
     db_session.add(ri)
     await db_session.flush()
 
-    # Confirm: invoice says 24 €/kg, ingredient is in g
-    # → normalize: convert_quantity(1, "g", "kg") = 0.001, factor = 0.001
-    # Wait — let me think: factor = convert_quantity(1, ing_unit="g", line_unit="kg")
-    # convert_quantity(1, "g", "kg") = 1 * 0.001 / 1.0 = 0.001
-    # new_price = 24 * 0.001 = 0.024 €/g ✓
-    # Recipe: 80g × 0.024 €/g = 1.92€ ✓
+    # Confirm: invoice says 24 €/kg
+    # normalize_to_base_unit("kg", 24.0) → ("kg", 24.0) — already base
+    # Recipe: convert_quantity(80, "g", "kg") = 0.08 → 0.08 × 24 = 1.92€ ✓
     with open(xml_file_path, "rb") as f:
         upload_resp = await client.post(
             "/api/invoices/upload",
@@ -633,12 +630,12 @@ async def test_confirm_price_normalization_fixes_food_cost(
         headers=auth_headers,
     )
 
-    # Unit stays "g", price normalized to 0.024 €/g
+    # Unit stays "kg", price = 24 €/kg
     await db_session.refresh(ingredient)
-    assert ingredient.unit == "g"
-    assert ingredient.current_price == pytest.approx(0.024, abs=0.0001)
+    assert ingredient.unit == "kg"
+    assert ingredient.current_price == pytest.approx(24.0, abs=0.01)
 
-    # Recipe: 80g × 0.024 €/g = 1.92€
+    # Recipe: convert_quantity(80, "g", "kg") = 0.08 → 0.08 × 24 = 1.92€
     await db_session.refresh(recipe)
     assert recipe.food_cost == pytest.approx(1.92, abs=0.01)
     assert recipe.food_cost_percent == pytest.approx(48.0, abs=0.1)

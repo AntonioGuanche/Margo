@@ -24,7 +24,7 @@ from app.schemas.ingredient import (
     PriceHistoryEntry,
     PriceHistoryResponse,
 )
-from app.services.costing import recalculate_recipes_for_ingredient
+from app.services.costing import normalize_to_base_unit, recalculate_recipes_for_ingredient
 from app.services.utils import guess_ingredient_category
 
 router = APIRouter()
@@ -144,14 +144,17 @@ async def create_ingredient(
     db: AsyncSession = Depends(get_db),
 ) -> IngredientResponse:
     """Create a new ingredient for the current restaurant."""
+    # Normalize to base unit (kg, l, piece)
+    base_unit, base_price = normalize_to_base_unit(data.unit, data.current_price)
+
     ingredient = Ingredient(
         restaurant_id=restaurant.id,
         name=data.name,
-        unit=data.unit,
-        current_price=data.current_price,
+        unit=base_unit,
+        current_price=base_price,
         supplier_name=data.supplier_name,
         category=data.category,
-        last_updated=func.now() if data.current_price is not None else None,
+        last_updated=func.now() if base_price is not None else None,
     )
 
     db.add(ingredient)
@@ -191,6 +194,15 @@ async def update_ingredient(
         )
 
     update_data = data.model_dump(exclude_unset=True)
+
+    # Normalize unit + price if either is being updated
+    if "unit" in update_data or "current_price" in update_data:
+        new_unit = update_data.get("unit", ingredient.unit)
+        new_price = update_data.get("current_price", ingredient.current_price)
+        base_unit, base_price = normalize_to_base_unit(new_unit, new_price)
+        update_data["unit"] = base_unit
+        if "current_price" in update_data:
+            update_data["current_price"] = base_price
 
     # Track if price changed to update last_updated
     price_changed = "current_price" in update_data and update_data["current_price"] != ingredient.current_price

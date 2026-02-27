@@ -22,7 +22,7 @@ from app.schemas.onboarding import (
     SuggestIngredientsRequest,
     SuggestIngredientsResponse,
 )
-from app.services.costing import calculate_food_cost
+from app.services.costing import calculate_food_cost, normalize_to_base_unit
 from app.services.onboarding_ai import extract_menu_from_image, suggest_ingredients_batch
 from app.services.storage import save_upload
 from app.services.utils import guess_ingredient_category
@@ -153,10 +153,12 @@ async def confirm_onboarding(
             if ingredient is None:
                 # Create new ingredient (without price — will be set from invoices)
                 guessed_cat = guess_ingredient_category(ing_data.name)
+                # Normalize unit to base (kg, l, piece)
+                base_unit, _ = normalize_to_base_unit(ing_data.unit, None)
                 ingredient = Ingredient(
                     restaurant_id=restaurant.id,
                     name=ing_data.name,
-                    unit=ing_data.unit,
+                    unit=base_unit,
                     category=guessed_cat,
                 )
                 db.add(ingredient)

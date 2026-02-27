@@ -24,6 +24,40 @@ UNIT_TO_BASE: dict[str, tuple[str, float]] = {
 }
 
 
+def normalize_to_base_unit(unit: str, price: float | None) -> tuple[str, float | None]:
+    """Normalize unit and price to base unit (kg, l, piece).
+
+    Ingredient prices are ALWAYS stored in base units.
+
+    Examples:
+        ("g", 0.024)   → ("kg", 24.0)      # 0.024 €/g × 1000 = 24 €/kg
+        ("kg", 24.0)    → ("kg", 24.0)      # already base
+        ("ml", 0.005)   → ("l", 5.0)        # 0.005 €/ml × 1000 = 5 €/l
+        ("cl", 0.05)    → ("l", 5.0)        # 0.05 €/cl × 100 = 5 €/l
+        ("l", 5.0)      → ("l", 5.0)        # already base
+        ("piece", 3.50) → ("piece", 3.50)   # already base
+        ("pce", 3.50)   → ("piece", 3.50)   # alias
+        ("g", None)     → ("kg", None)       # no price, still normalize unit
+    """
+    unit = unit.lower().strip()
+    info = UNIT_TO_BASE.get(unit)
+
+    if info is None:
+        return unit, price  # Unknown unit, leave as-is
+
+    base_unit, factor = info
+
+    if factor == 1.0 and unit == base_unit:
+        return unit, price  # Already base unit
+
+    # Normalize price: price_per_sub_unit / factor = price_per_base_unit
+    # Example: 0.024 €/g → factor for g is 0.001
+    #          price_per_kg = 0.024 / 0.001 = 24.0
+    normalized_price = round(price / factor, 6) if price is not None else None
+
+    return base_unit, normalized_price
+
+
 def convert_quantity(qty: float, from_unit: str, to_unit: str) -> float:
     """Convert quantity from from_unit to to_unit.
 

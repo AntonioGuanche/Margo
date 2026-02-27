@@ -144,6 +144,11 @@ export default function IngredientForm({
               step="0.01"
               min="0"
             />
+            {(unit === 'g' || unit === 'cl') && (
+              <p className="text-xs text-stone-400 mt-1">
+                Le prix sera automatiquement converti en €/{unit === 'g' ? 'kg' : 'l'}.
+              </p>
+            )}
           </div>
 
           <div>
