@@ -157,6 +157,7 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - **€ symbol:** Price input in StepDishes uses absolute-positioned € suffix (not in placeholder)
 - **Shared types:** `frontend/src/types/` directory with 8 files mirroring Pydantic schemas (ingredient.ts, recipe.ts, invoice.ts, alert.ts, restaurant.ts, simulator.ts, admin.ts, index.ts). All hooks import from `types/`, re-export key types for backward compatibility. Pages import types from `../types` directly. Convention: `*Response` for API responses, `*Request` for requests, `*State` for frontend state.
 - **Admin access:** `ADMIN_EMAILS` env var (comma-separated). `get_admin` dependency in `dependencies.py` checks `restaurant.owner_email` against admin list. Frontend uses `GET /admin/check` (useAdminCheck hook) to conditionally show admin sidebar link (Shield icon). Admin router at `/admin` prefix with 5 endpoints: check, stats, users, update plan, normalize-units per restaurant.
+- **DB Reset:** `POST /api/restaurants/reset` bulk-deletes all data for authenticated restaurant. Delete order: aliases → price_history → recipes (cascade recipe_ingredients) → ingredients → invoices. Explicit alias delete and price_history delete needed because bulk `delete()` bypasses ORM cascade and `IngredientPriceHistory.invoice_id` has no `ondelete`. Settings.tsx "Zone de danger" section with RÉINITIALISER text confirmation. Redirects to dashboard after reset.
 
 ## IMPORTANT rules
 
@@ -188,14 +189,7 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 36 complete — Fix données corrompues + sidebar sticky.
-- `POST /admin/users/{id}/fix-inflated-prices` : corrige les prix sur-gonflés par la migration Sprint 34 (÷1000 ou ÷100 jusqu'à seuil raisonnable kg≤500€, l≤200€, piece≤100€), recalcule les recettes. Bouton "Fix prix" (icône Wrench) dans Admin.tsx (desktop row + mobile card).
-- Sidebar desktop rendue sticky : `sticky top-0 h-screen overflow-y-auto` sur `<aside>`.
-- `FixInflatedPricesResponse` type + `useFixInflatedPrices()` hook.
-
-### ⚠️ À faire après déploiement
-
-Appuyer sur le bouton "Fix prix" dans la page Admin pour chaque restaurant affecté. Vérifier que le dashboard revient à des % normaux (< 100% food cost).
+Sprint 37 complete — Reset DB depuis Paramètres. Endpoint `POST /api/restaurants/reset` supprime toutes les données (recettes, ingrédients, factures, aliases, price_history) du restaurant en respectant l'ordre FK. Section "Zone de danger" dans Settings.tsx avec confirmation RÉINITIALISER. Retrait du fix-inflated-prices du Sprint 36.
 
 ### Sprint history
-Previous: Sprint 35 (admin panel + query limit 500), Sprint 34 (normalisation unités — migration exécutée avec sur-inflation), Sprint 33 (P4 types partagés), Sprint 32 (P3 fiabilité), Sprint 31 (P2 navigation), Sprint 30 (hardening P0+P1), Sprint 29b (unit sync on confirm), Sprint 29 (unit conversion), Sprint 28b (batch recipe pre-fill), Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component), Sprint 25 (ingredient chips). See @PLAN.md for original roadmap.
+Previous: Sprint 36 (fix-inflated-prices + sidebar sticky — fix-inflated-prices ensuite retiré au Sprint 37), Sprint 35 (admin panel + query limit 500), Sprint 34 (normalisation unités — migration avec sur-inflation), Sprint 33 (P4 types partagés), Sprint 32 (P3 fiabilité), Sprint 31 (P2 navigation), Sprint 30 (hardening P0+P1), Sprint 29b (unit sync on confirm), Sprint 29 (unit conversion), Sprint 28b (batch recipe pre-fill), Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component), Sprint 25 (ingredient chips). See @PLAN.md for original roadmap.

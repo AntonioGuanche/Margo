@@ -31,18 +31,6 @@ export interface AdminCheckResponse {
   is_admin: boolean;
 }
 
-export interface FixInflatedPricesResponse {
-  prices_fixed: number;
-  ingredients_total: number;
-  recipes_recalculated: number;
-  details: Array<{
-    name: string;
-    unit: string;
-    old_price: number;
-    new_price: number;
-  }>;
-}
-
 export interface NormalizeUnitsResponse {
   ingredients_fixed: number;
   ingredients_total: number;

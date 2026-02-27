@@ -1,9 +1,12 @@
-"""Tests for restaurant management — list, create sub, switch."""
+"""Tests for restaurant management — list, create sub, switch, reset."""
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.ingredient import Ingredient
+from app.models.invoice import Invoice
+from app.models.recipe import Recipe
 from app.models.restaurant import Restaurant
 from app.services.auth import create_access_token
 
@@ -48,6 +51,63 @@ async def test_create_sub_restaurant_free(
     )
     assert resp.status_code == 403
     assert "Multi" in resp.json()["detail"]
+
+
+async def test_reset_restaurant_data(
+    client: AsyncClient, auth_headers: dict, db_session: AsyncSession, restaurant: Restaurant,
+):
+    """POST /api/restaurants/reset deletes all ingredients, recipes, invoices."""
+    # Create an ingredient
+    ing = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Beurre",
+        unit="kg",
+        current_price=8.0,
+    )
+    db_session.add(ing)
+
+    # Create a recipe
+    recipe = Recipe(
+        restaurant_id=restaurant.id,
+        name="Crêpe",
+        selling_price=12.0,
+    )
+    db_session.add(recipe)
+
+    # Create an invoice
+    invoice = Invoice(
+        restaurant_id=restaurant.id,
+        supplier_name="Test Supplier",
+        source="upload",
+        format="image",
+        status="pending_review",
+    )
+    db_session.add(invoice)
+    await db_session.flush()
+
+    # Verify they exist
+    resp = await client.get("/api/ingredients", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+
+    resp = await client.get("/api/recipes", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+
+    # Reset
+    resp = await client.post("/api/restaurants/reset", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["recipes_deleted"] == 1
+    assert data["ingredients_deleted"] == 1
+    assert data["invoices_deleted"] == 1
+
+    # Verify all gone
+    resp = await client.get("/api/ingredients", headers=auth_headers)
+    assert resp.json()["total"] == 0
+
+    resp = await client.get("/api/recipes", headers=auth_headers)
+    assert resp.json()["total"] == 0
 
 
 async def test_switch_restaurant(

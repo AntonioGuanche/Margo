@@ -8,7 +8,6 @@ import {
   RefreshCw,
   Shield,
   Loader2,
-  Wrench,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -16,7 +15,6 @@ import {
   useAdminUsers,
   useUpdateUserPlan,
   useNormalizeUnits,
-  useFixInflatedPrices,
 } from '../hooks/useAdmin';
 import type { AdminUser } from '../types';
 
@@ -99,9 +97,7 @@ function UserRow({ user }: { user: AdminUser }) {
   const [showPlanDropdown, setShowPlanDropdown] = useState(false);
   const updatePlan = useUpdateUserPlan();
   const normalizeUnits = useNormalizeUnits();
-  const fixPrices = useFixInflatedPrices();
   const [normalizing, setNormalizing] = useState(false);
-  const [fixing, setFixing] = useState(false);
 
   function handlePlanChange(plan: string) {
     setShowPlanDropdown(false);
@@ -126,22 +122,6 @@ function UserRow({ user }: { user: AdminUser }) {
       onError: (err) => {
         toast.error(err.message);
         setNormalizing(false);
-      },
-    });
-  }
-
-  function handleFixPrices() {
-    setFixing(true);
-    fixPrices.mutate(user.id, {
-      onSuccess: (data) => {
-        toast.success(
-          `${data.prices_fixed} prix corrigé(s), ${data.recipes_recalculated} recette(s) recalculée(s)`,
-        );
-        setFixing(false);
-      },
-      onError: (err) => {
-        toast.error(err.message);
-        setFixing(false);
       },
     });
   }
@@ -181,32 +161,18 @@ function UserRow({ user }: { user: AdminUser }) {
       <td className="py-3 px-3 text-sm text-stone-700 text-center">{user.ingredients_count}</td>
       <td className="py-3 px-3 text-sm text-stone-700 text-center">{user.invoices_count}</td>
       <td className="py-3 px-3">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={handleFixPrices}
-            disabled={fixing}
-            className="text-stone-400 hover:text-red-600 disabled:opacity-50 transition-colors p-1"
-            title="Corriger les prix sur-gonflés"
-          >
-            {fixing ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Wrench size={16} />
-            )}
-          </button>
-          <button
-            onClick={handleNormalize}
-            disabled={normalizing}
-            className="text-stone-400 hover:text-orange-600 disabled:opacity-50 transition-colors p-1"
-            title="Normaliser les unités"
-          >
-            {normalizing ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <RefreshCw size={16} />
-            )}
-          </button>
-        </div>
+        <button
+          onClick={handleNormalize}
+          disabled={normalizing}
+          className="text-stone-400 hover:text-orange-600 disabled:opacity-50 transition-colors p-1"
+          title="Normaliser les unités"
+        >
+          {normalizing ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <RefreshCw size={16} />
+          )}
+        </button>
       </td>
     </tr>
   );
@@ -220,9 +186,7 @@ function UserCard({ user }: { user: AdminUser }) {
   const [showPlanDropdown, setShowPlanDropdown] = useState(false);
   const updatePlan = useUpdateUserPlan();
   const normalizeUnits = useNormalizeUnits();
-  const fixPrices = useFixInflatedPrices();
   const [normalizing, setNormalizing] = useState(false);
-  const [fixing, setFixing] = useState(false);
 
   function handlePlanChange(plan: string) {
     setShowPlanDropdown(false);
@@ -247,22 +211,6 @@ function UserCard({ user }: { user: AdminUser }) {
       onError: (err) => {
         toast.error(err.message);
         setNormalizing(false);
-      },
-    });
-  }
-
-  function handleFixPrices() {
-    setFixing(true);
-    fixPrices.mutate(user.id, {
-      onSuccess: (data) => {
-        toast.success(
-          `${data.prices_fixed} prix corrigé(s), ${data.recipes_recalculated} recalculée(s)`,
-        );
-        setFixing(false);
-      },
-      onError: (err) => {
-        toast.error(err.message);
-        setFixing(false);
       },
     });
   }
@@ -319,32 +267,18 @@ function UserCard({ user }: { user: AdminUser }) {
         <span>{timeAgo(user.updated_at)}</span>
       </div>
 
-      <div className="flex gap-2">
-        <button
-          onClick={handleFixPrices}
-          disabled={fixing}
-          className="flex-1 flex items-center justify-center gap-2 text-sm text-stone-600 hover:text-red-700 border border-stone-200 rounded-lg py-2 disabled:opacity-50 transition-colors"
-        >
-          {fixing ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <Wrench size={14} />
-          )}
-          Fix prix
-        </button>
-        <button
-          onClick={handleNormalize}
-          disabled={normalizing}
-          className="flex-1 flex items-center justify-center gap-2 text-sm text-stone-600 hover:text-orange-700 border border-stone-200 rounded-lg py-2 disabled:opacity-50 transition-colors"
-        >
-          {normalizing ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <RefreshCw size={14} />
-          )}
-          Normaliser
-        </button>
-      </div>
+      <button
+        onClick={handleNormalize}
+        disabled={normalizing}
+        className="w-full flex items-center justify-center gap-2 text-sm text-stone-600 hover:text-orange-700 border border-stone-200 rounded-lg py-2 disabled:opacity-50 transition-colors"
+      >
+        {normalizing ? (
+          <Loader2 size={14} className="animate-spin" />
+        ) : (
+          <RefreshCw size={14} />
+        )}
+        Normaliser les unités
+      </button>
     </div>
   );
 }

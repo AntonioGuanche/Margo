@@ -4,11 +4,16 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_restaurant
+from app.models.ingredient import Ingredient
+from app.models.ingredient_alias import IngredientAlias
+from app.models.invoice import Invoice
+from app.models.price_history import IngredientPriceHistory
+from app.models.recipe import Recipe
 from app.models.restaurant import Restaurant
 from app.services.auth import create_access_token
 
@@ -44,6 +49,53 @@ class SwitchResponse(BaseModel):
 class UpdateRestaurantRequest(BaseModel):
     name: str | None = None
     default_target_margin: float | None = None
+
+
+@router.post("/reset", status_code=200)
+async def reset_restaurant_data(
+    restaurant: Restaurant = Depends(get_current_restaurant),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Delete ALL data (recipes, ingredients, invoices, aliases, price_history) for the current restaurant."""
+    restaurant_id = restaurant.id
+
+    # 1. Delete aliases explicitly (bulk delete bypasses ORM cascade)
+    await db.execute(
+        delete(IngredientAlias).where(IngredientAlias.restaurant_id == restaurant_id)
+    )
+
+    # 2. Delete price history before invoices (invoice_id FK has no ondelete,
+    #    so invoices can't be deleted while price_history still references them)
+    await db.execute(
+        delete(IngredientPriceHistory).where(
+            IngredientPriceHistory.ingredient_id.in_(
+                select(Ingredient.id).where(Ingredient.restaurant_id == restaurant_id)
+            )
+        )
+    )
+
+    # 3. Delete recipes — DB CASCADE on recipe_id removes recipe_ingredients
+    result_recipes = await db.execute(
+        delete(Recipe).where(Recipe.restaurant_id == restaurant_id)
+    )
+
+    # 4. Delete ingredients (safe: recipe_ingredients and price_history already gone)
+    result_ingredients = await db.execute(
+        delete(Ingredient).where(Ingredient.restaurant_id == restaurant_id)
+    )
+
+    # 5. Delete invoices (safe: price_history already gone)
+    result_invoices = await db.execute(
+        delete(Invoice).where(Invoice.restaurant_id == restaurant_id)
+    )
+
+    await db.flush()
+
+    return {
+        "recipes_deleted": result_recipes.rowcount,
+        "invoices_deleted": result_invoices.rowcount,
+        "ingredients_deleted": result_ingredients.rowcount,
+    }
 
 
 @router.get("", response_model=RestaurantListResponse)

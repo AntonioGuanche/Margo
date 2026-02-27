@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, ExternalLink, Plus } from 'lucide-react';
+import { ArrowLeft, Download, ExternalLink, Plus, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { usePlanInfo, openCustomerPortal } from '../hooks/useBilling';
 import {
@@ -23,6 +23,9 @@ export default function Settings() {
   const [addingSub, setAddingSub] = useState(false);
   const [exportFrom, setExportFrom] = useState('');
   const [exportTo, setExportTo] = useState('');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   const plan = planInfo?.current_plan || 'free';
   const mainRestaurant = restaurants?.main;
@@ -83,6 +86,30 @@ export default function Settings() {
       navigate('/');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erreur');
+    }
+  }
+
+  async function handleReset() {
+    setResetting(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/restaurants/reset', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Erreur lors de la réinitialisation');
+      const data = await res.json();
+      toast.success(
+        `${data.recipes_deleted} recettes, ${data.ingredients_deleted} ingrédients, ${data.invoices_deleted} factures supprimés`,
+      );
+      queryClient.invalidateQueries();
+      setShowResetConfirm(false);
+      setResetConfirmText('');
+      navigate('/');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur');
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -308,6 +335,57 @@ export default function Settings() {
             </button>
           </div>
         </div>
+      </section>
+
+      {/* Zone de danger */}
+      <section className="bg-white rounded-xl border border-red-200 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <AlertTriangle size={18} className="text-red-600" />
+          <h2 className="font-semibold text-red-700">Zone de danger</h2>
+        </div>
+        <p className="text-sm text-stone-600">
+          Supprimer toutes les recettes, ingrédients et factures de ce restaurant.
+          Cette action est irréversible.
+        </p>
+
+        {!showResetConfirm ? (
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            className="text-sm border border-red-300 text-red-700 px-4 py-2 rounded-lg hover:bg-red-50 transition-colors"
+          >
+            Réinitialiser toutes les données
+          </button>
+        ) : (
+          <div className="space-y-3 bg-red-50 rounded-lg p-3">
+            <p className="text-sm text-red-700 font-medium">
+              Tape <strong>RÉINITIALISER</strong> pour confirmer :
+            </p>
+            <input
+              value={resetConfirmText}
+              onChange={(e) => setResetConfirmText(e.target.value)}
+              className="w-full border border-red-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-red-400"
+              placeholder="RÉINITIALISER"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleReset}
+                disabled={resetConfirmText !== 'RÉINITIALISER' || resetting}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {resetting ? 'Suppression...' : 'Confirmer la suppression'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowResetConfirm(false);
+                  setResetConfirmText('');
+                }}
+                className="text-stone-500 px-4 py-2 rounded-lg text-sm hover:bg-stone-100 transition-colors"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );
