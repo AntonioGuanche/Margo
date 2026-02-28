@@ -279,7 +279,7 @@ export default function Ingredients() {
       {deleting && (
         <ConfirmModal
           title={`Supprimer « ${deleting.name} » ?`}
-          message="Cette action est irréversible. Les recettes utilisant cet ingrédient seront affectées."
+          message="L'ingrédient sera supprimé et retiré de toutes les recettes qui l'utilisent. Le food cost de ces recettes sera recalculé. Cette action est irréversible."
           onConfirm={handleDelete}
           onCancel={() => setDeleting(null)}
           isLoading={deleteMutation.isPending}

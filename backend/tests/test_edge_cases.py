@@ -216,13 +216,12 @@ async def test_delete_ingredient_used_in_recipe(
     )
     assert resp.status_code == 201
 
-    # Delete the ingredient — should return 409 since it's used in a recipe
+    # Delete the ingredient — should cascade (204) and remove recipe_ingredient links
     resp = await client.delete(
         f"/api/ingredients/{ingredient.id}",
         headers=auth_headers,
     )
-    assert resp.status_code == 409
-    assert "utilisé" in resp.json()["detail"]
+    assert resp.status_code == 204
 
 
 async def test_upload_too_large_file(
@@ -294,11 +293,10 @@ async def test_confirm_already_confirmed_invoice(
     )
     assert resp.status_code == 200
 
-    # Second confirm → error
+    # Second confirm → allowed (re-confirm feature added in Sprint 27)
     resp = await client.post(
         f"/api/invoices/{invoice_id}/confirm",
         json={"lines": []},
         headers=auth_headers,
     )
-    assert resp.status_code == 409
-    assert "déjà été confirmée" in resp.json()["detail"]
+    assert resp.status_code == 200

@@ -1,7 +1,7 @@
 """CRUD routes for ingredients."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,7 +24,7 @@ from app.schemas.ingredient import (
     PriceHistoryEntry,
     PriceHistoryResponse,
 )
-from app.services.costing import normalize_to_base_unit, recalculate_recipes_for_ingredient
+from app.services.costing import normalize_to_base_unit, recalculate_recipe, recalculate_recipes_for_ingredient
 from app.services.utils import guess_ingredient_category
 
 router = APIRouter()
@@ -347,20 +347,25 @@ async def delete_ingredient(
             detail="Ingrédient introuvable",
         )
 
-    # Check if ingredient is used in any recipe
-    usage_result = await db.execute(
-        select(func.count()).select_from(
-            select(RecipeIngredient).where(
-                RecipeIngredient.ingredient_id == ingredient_id
-            ).subquery()
+    # Find recipes using this ingredient (for recalculation after removal)
+    ri_result = await db.execute(
+        select(RecipeIngredient.recipe_id).where(
+            RecipeIngredient.ingredient_id == ingredient_id
         )
     )
-    usage_count = usage_result.scalar_one()
-    if usage_count > 0:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Cet ingrédient est utilisé dans {usage_count} recette{'s' if usage_count > 1 else ''}. Retire-le des recettes avant de le supprimer.",
+    affected_recipe_ids = [row[0] for row in ri_result.all()]
+
+    # Delete recipe_ingredient links (no ondelete=CASCADE on DB yet)
+    if affected_recipe_ids:
+        await db.execute(
+            delete(RecipeIngredient).where(
+                RecipeIngredient.ingredient_id == ingredient_id
+            )
         )
 
     await db.delete(ingredient)
     await db.flush()
+
+    # Recalculate food cost for affected recipes
+    for recipe_id in affected_recipe_ids:
+        await recalculate_recipe(db, recipe_id)

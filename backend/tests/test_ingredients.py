@@ -394,3 +394,69 @@ async def test_recipes_batch_empty(
     )
     assert resp.status_code == 200
     assert resp.json()["results"] == {}
+
+
+async def test_delete_ingredient_with_recipes(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    db_session: AsyncSession,
+    restaurant: Restaurant,
+) -> None:
+    """DELETE /api/ingredients/{id} cascades to recipe_ingredients and recalculates food cost.
+
+    Regression test for Sprint 40: previously returned 409 when ingredient was used
+    in a recipe. Now it should silently remove the recipe_ingredient links and
+    recalculate food cost for affected recipes.
+    """
+    from sqlalchemy import select
+
+    # Create ingredient
+    ing = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Boeuf cascade test",
+        unit="kg",
+        current_price=15.0,
+    )
+    db_session.add(ing)
+    await db_session.flush()
+    await db_session.refresh(ing)
+
+    # Create recipe using that ingredient
+    recipe = Recipe(
+        restaurant_id=restaurant.id,
+        name="Steak test cascade",
+        selling_price=20.0,
+        is_homemade=True,
+    )
+    db_session.add(recipe)
+    await db_session.flush()
+    await db_session.refresh(recipe)
+
+    ri = RecipeIngredient(recipe_id=recipe.id, ingredient_id=ing.id, quantity=0.2, unit="kg")
+    db_session.add(ri)
+    await db_session.flush()
+
+    # Delete ingredient — should succeed (no 409)
+    resp = await client.delete(f"/api/ingredients/{ing.id}", headers=auth_headers)
+    assert resp.status_code == 204
+
+    # Ingredient is gone
+    ing_check = await db_session.execute(
+        select(Ingredient).where(Ingredient.id == ing.id)
+    )
+    assert ing_check.scalar_one_or_none() is None
+
+    # recipe_ingredient link is gone
+    ri_check = await db_session.execute(
+        select(RecipeIngredient).where(RecipeIngredient.ingredient_id == ing.id)
+    )
+    assert ri_check.scalar_one_or_none() is None
+
+    # Recipe still exists
+    recipe_check = await db_session.execute(
+        select(Recipe).where(Recipe.id == recipe.id)
+    )
+    recipe_row = recipe_check.scalar_one_or_none()
+    assert recipe_row is not None
+    # food_cost recalculated — no ingredients left, so 0.0 or None
+    assert recipe_row.food_cost is None or recipe_row.food_cost == 0.0
