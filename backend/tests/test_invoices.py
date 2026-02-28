@@ -684,6 +684,73 @@ async def test_confirm_ignores_unknown_unit(
     assert ingredient.current_price == 1.80
 
 
+async def test_delete_confirmed_with_price_history(
+    client, auth_headers, db_session, restaurant, xml_file_path
+):
+    """Delete a confirmed invoice that has price_history entries → 204, no FK crash.
+
+    Regression test for Sprint 38: IngredientPriceHistory.invoice_id FK had no
+    ondelete, causing a crash when deleting invoices that were referenced by
+    price history rows. Fix: SET NULL on price_history.invoice_id before delete.
+    """
+    from app.models.price_history import IngredientPriceHistory
+    from sqlalchemy import select
+
+    # Create an ingredient and upload + confirm an invoice to generate price history
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Viande test",
+        unit="kg",
+        current_price=10.0,
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    # Confirm the invoice — this creates a IngredientPriceHistory row with invoice_id set
+    confirm_resp = await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={
+            "lines": [
+                {
+                    "description": "Boeuf haché",
+                    "ingredient_id": ingredient.id,
+                    "unit_price": 15.0,
+                    "unit": "kg",
+                }
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert confirm_resp.status_code == 200
+
+    # Verify price history was created with invoice_id set
+    ph_result = await db_session.execute(
+        select(IngredientPriceHistory).where(
+            IngredientPriceHistory.ingredient_id == ingredient.id
+        )
+    )
+    ph_rows = ph_result.scalars().all()
+    assert len(ph_rows) == 1
+    assert ph_rows[0].invoice_id == invoice_id
+
+    # Delete the confirmed invoice — must NOT crash (FK safe)
+    resp = await client.delete(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert resp.status_code == 204
+
+    # Price history row still exists, but invoice_id is now NULL
+    await db_session.refresh(ph_rows[0])
+    assert ph_rows[0].invoice_id is None
+
+
 async def test_invoices_protected(client):
     """Without auth token → 401."""
     resp = await client.get("/api/invoices")

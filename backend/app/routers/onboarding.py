@@ -179,7 +179,9 @@ async def confirm_onboarding(
                 select(Ingredient).where(Ingredient.id == ri_data["ingredient_id"])
             )
             ing = ing_result.scalar_one()
-            ingredients_with_prices.append((ri_data["quantity"], ing.current_price))
+            ingredients_with_prices.append(
+                (ri_data["quantity"], ri_data["unit"], ing.current_price, ing.unit)
+            )
 
         food_cost, food_cost_percent = calculate_food_cost(
             ingredients_with_prices, dish.selling_price

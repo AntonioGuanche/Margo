@@ -4,7 +4,7 @@ import datetime as dt
 import logging
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -358,7 +358,7 @@ async def confirm_invoice(
                 current_price=base_price,
                 supplier_name=invoice.supplier_name,
                 category=guess_ingredient_category(line.create_ingredient_name),
-                last_updated=dt.datetime.utcnow(),
+                last_updated=dt.datetime.now(dt.timezone.utc).replace(tzinfo=None),
             )
             db.add(new_ingredient)
             await db.flush()
@@ -386,7 +386,7 @@ async def confirm_invoice(
                 if new_price is not None and line.unit:
                     _, new_price = normalize_to_base_unit(line.unit, new_price)
                 ingredient.current_price = new_price
-                ingredient.last_updated = dt.datetime.utcnow()
+                ingredient.last_updated = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
                 if invoice.supplier_name:
                     ingredient.supplier_name = invoice.supplier_name
                 prices_updated += 1
@@ -550,6 +550,13 @@ async def delete_invoice(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Facture introuvable.",
         )
+
+    # Detach price history entries before deleting invoice (invoice_id FK has no ondelete)
+    await db.execute(
+        update(IngredientPriceHistory)
+        .where(IngredientPriceHistory.invoice_id == invoice_id)
+        .values(invoice_id=None)
+    )
 
     await db.delete(invoice)
     await db.flush()

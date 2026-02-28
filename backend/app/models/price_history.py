@@ -18,7 +18,7 @@ class IngredientPriceHistory(Base):
     price: Mapped[float] = mapped_column(nullable=False)
     date: Mapped[dt.date] = mapped_column(Date, nullable=False)
     invoice_id: Mapped[int | None] = mapped_column(
-        ForeignKey("invoices.id"), nullable=True
+        ForeignKey("invoices.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
 
