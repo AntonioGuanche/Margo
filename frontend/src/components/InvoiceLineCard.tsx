@@ -2,11 +2,13 @@ import { useState } from 'react';
 import {
   AlertTriangle,
   Check,
+  Pencil,
   Trash2,
   Undo2,
   X,
 } from 'lucide-react';
 import ConfidenceBadge from './ConfidenceBadge';
+import QuickRenameModal from './QuickRenameModal';
 import RecipeLinker from './RecipeLinker';
 import type { LineState, IngredientItem } from '../types';
 
@@ -30,15 +32,22 @@ export default function InvoiceLineCard({
   allIngredients,
   recipesList,
   onChange,
+  onRenameIngredient,
+  onRenameRecipe,
 }: {
   line: LineState;
   allIngredients: IngredientItem[];
   recipesList: { id: number; name: string }[];
   onChange: (updates: Partial<LineState>) => void;
+  onRenameIngredient?: (ingredientId: number, newName: string) => Promise<void>;
+  onRenameRecipe?: (recipeId: number, newName: string) => Promise<void>;
 }) {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [renamingIngredient, setRenamingIngredient] = useState(false);
+  const [isRenamingLoading, setIsRenamingLoading] = useState(false);
+  const [localIngredientName, setLocalIngredientName] = useState<string | null>(null);
   const handleSelectIngredient = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     if (value === '__create__') {
@@ -50,6 +59,7 @@ export default function InvoiceLineCard({
       onChange({ ingredient_id: null, create_ingredient_name: null, ignored: true });
     } else {
       setShowCreate(false);
+      setLocalIngredientName(null);
       onChange({ ingredient_id: parseInt(value, 10), create_ingredient_name: null, ignored: false, recipe_links: [] });
     }
   };
@@ -242,8 +252,17 @@ export default function InvoiceLineCard({
                   <span className="text-orange-800 font-medium">
                     {line.create_ingredient_name
                       ? line.create_ingredient_name
-                      : allIngredients.find(i => i.id === line.ingredient_id)?.name ?? 'Ingrédient'}
+                      : localIngredientName ?? allIngredients.find(i => i.id === line.ingredient_id)?.name ?? 'Ingrédient'}
                   </span>
+                  {!line.create_ingredient_name && line.ingredient_id && onRenameIngredient && (
+                    <button
+                      onClick={() => setRenamingIngredient(true)}
+                      className="text-stone-400 hover:text-orange-600 transition-colors"
+                      title="Renommer l'ingrédient"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  )}
                   {line.volume_liters && (
                     <span className="text-blue-500 text-xs">— en €/l</span>
                   )}
@@ -264,6 +283,7 @@ export default function InvoiceLineCard({
                   <button
                     onClick={() => {
                       setShowCreate(false);
+                      setLocalIngredientName(null);
                       onChange({ ingredient_id: null, create_ingredient_name: null, recipe_links: [] });
                     }}
                     className="text-stone-400 hover:text-red-500 transition-colors ml-1"
@@ -387,9 +407,31 @@ export default function InvoiceLineCard({
                   : undefined
               }
               onChange={(links) => onChange({ recipe_links: links })}
+              onRenameRecipe={onRenameRecipe}
             />
           )}
         </div>
+      )}
+
+      {/* Quick rename modal for existing ingredient */}
+      {renamingIngredient && line.ingredient_id && (
+        <QuickRenameModal
+          title="Renommer l'ingrédient"
+          currentName={localIngredientName ?? allIngredients.find(i => i.id === line.ingredient_id)?.name ?? ''}
+          isLoading={isRenamingLoading}
+          onCancel={() => setRenamingIngredient(false)}
+          onSave={async (newIngName) => {
+            if (!onRenameIngredient) return;
+            setIsRenamingLoading(true);
+            try {
+              await onRenameIngredient(line.ingredient_id!, newIngName);
+              setLocalIngredientName(newIngName);
+              setRenamingIngredient(false);
+            } finally {
+              setIsRenamingLoading(false);
+            }
+          }}
+        />
       )}
     </div>
   );

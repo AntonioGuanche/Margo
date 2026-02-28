@@ -12,8 +12,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useInvoice, useConfirmInvoice, usePatchInvoice } from '../hooks/useInvoices';
-import { useIngredients } from '../hooks/useIngredients';
-import { useRecipes } from '../hooks/useRecipes';
+import { useIngredients, useUpdateIngredient } from '../hooks/useIngredients';
+import { useRecipes, useUpdateRecipe } from '../hooks/useRecipes';
 import { apiClient } from '../api/client';
 import InvoiceLineCard from '../components/InvoiceLineCard';
 import type { InvoiceLineResponse, LineState, IngredientItem, IngredientRecipeItem } from '../types';
@@ -28,7 +28,23 @@ export default function InvoiceReview() {
   const { data: recipesData } = useRecipes();
   const confirm = useConfirmInvoice(id ?? '0');
   const patchInvoice = usePatchInvoice(id ?? '0');
+  const updateIngredient = useUpdateIngredient();
+  const updateRecipe = useUpdateRecipe();
   const [showResult, setShowResult] = useState(false);
+
+  async function handleRenameIngredient(ingredientId: number, newName: string) {
+    await updateIngredient.mutateAsync(
+      { id: ingredientId, data: { name: newName } },
+      { onSuccess: () => toast.success('Ingrédient renommé ✅') },
+    );
+  }
+
+  async function handleRenameRecipe(recipeId: number, newName: string) {
+    await updateRecipe.mutateAsync(
+      { id: recipeId, data: { name: newName } },
+      { onSuccess: () => toast.success('Recette renommée ✅') },
+    );
+  }
 
   const [lines, setLines] = useState<LineState[]>([]);
   const [initialized, setInitialized] = useState(false);
@@ -406,6 +422,8 @@ export default function InvoiceReview() {
             allIngredients={allIngredients}
             recipesList={recipesList}
             onChange={(updates) => updateLine(index, updates)}
+            onRenameIngredient={handleRenameIngredient}
+            onRenameRecipe={handleRenameRecipe}
           />
         ))}
       </div>
@@ -438,6 +456,8 @@ export default function InvoiceReview() {
                   allIngredients={allIngredients}
                   recipesList={recipesList}
                   onChange={(updates) => updateLine(index, updates)}
+                  onRenameIngredient={handleRenameIngredient}
+                  onRenameRecipe={handleRenameRecipe}
                 />
               ))}
             </div>

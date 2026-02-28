@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, Plus, X } from 'lucide-react';
+import { Check, Pencil, Plus, X } from 'lucide-react';
 import { apiClient } from '../api/client';
 import type { RecipeLinkState, IngredientRecipeItem } from '../types';
+import QuickRenameModal from './QuickRenameModal';
 
 const CATEGORIES = ['entrée', 'plat', 'dessert', 'boisson', 'autre'];
 
@@ -17,6 +18,7 @@ export default function RecipeLinker({
   lineDescription,
   volumeInfo,
   onChange,
+  onRenameRecipe,
 }: {
   ingredientId: number | null;
   recipeLinks: RecipeLinkState[];
@@ -24,6 +26,7 @@ export default function RecipeLinker({
   lineDescription: string;
   volumeInfo?: VolumeInfo;
   onChange: (links: RecipeLinkState[]) => void;
+  onRenameRecipe?: (recipeId: number, newName: string) => Promise<void>;
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -32,6 +35,8 @@ export default function RecipeLinker({
   const [newRecipeCategory, setNewRecipeCategory] = useState('boisson');
   const [newRecipeIsHomemade, setNewRecipeIsHomemade] = useState(false);
   const [autoSuggested, setAutoSuggested] = useState(false);
+  const [renamingIdx, setRenamingIdx] = useState<number | null>(null);
+  const [isRenamingRecipe, setIsRenamingRecipe] = useState(false);
 
   // Reset auto-suggestion flag when ingredient changes
   useEffect(() => {
@@ -123,6 +128,15 @@ export default function RecipeLinker({
           <span className="text-sm font-medium text-blue-800 flex-1 truncate">
             {link.recipe_name}
           </span>
+          {!link.is_new && onRenameRecipe && (
+            <button
+              onClick={() => setRenamingIdx(idx)}
+              className="text-stone-400 hover:text-blue-600 transition-colors shrink-0"
+              title="Renommer la recette"
+            >
+              <Pencil size={12} />
+            </button>
+          )}
           {link.is_new && (
             <span className="text-emerald-600 text-xs flex items-center gap-0.5 shrink-0">
               <Check size={12} />
@@ -158,6 +172,28 @@ export default function RecipeLinker({
           </button>
         </div>
       ))}
+
+      {/* Rename recipe modal */}
+      {renamingIdx !== null && recipeLinks[renamingIdx] && (
+        <QuickRenameModal
+          title="Renommer la recette"
+          currentName={recipeLinks[renamingIdx].recipe_name}
+          isLoading={isRenamingRecipe}
+          onCancel={() => setRenamingIdx(null)}
+          onSave={async (newName) => {
+            const link = recipeLinks[renamingIdx];
+            if (!onRenameRecipe || !link.recipe_id) return;
+            setIsRenamingRecipe(true);
+            try {
+              await onRenameRecipe(link.recipe_id, newName);
+              onChange(recipeLinks.map((l, i) => i === renamingIdx ? { ...l, recipe_name: newName } : l));
+              setRenamingIdx(null);
+            } finally {
+              setIsRenamingRecipe(false);
+            }
+          }}
+        />
+      )}
 
       {/* Add recipe button/dropdown */}
       {!showAdd ? (
