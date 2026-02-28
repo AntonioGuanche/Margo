@@ -6,17 +6,23 @@ import type { RecipeLinkState, IngredientRecipeItem } from '../types';
 
 const CATEGORIES = ['entrée', 'plat', 'dessert', 'boisson', 'autre'];
 
+interface VolumeInfo {
+  servingCl: number;
+}
+
 export default function RecipeLinker({
   ingredientId,
   recipeLinks,
   recipesList,
   lineDescription,
+  volumeInfo,
   onChange,
 }: {
   ingredientId: number | null;
   recipeLinks: RecipeLinkState[];
   recipesList: { id: number; name: string }[];
   lineDescription: string;
+  volumeInfo?: VolumeInfo;
   onChange: (links: RecipeLinkState[]) => void;
 }) {
   const [showAdd, setShowAdd] = useState(false);
@@ -66,8 +72,8 @@ export default function RecipeLinker({
       {
         recipe_id: recipeId,
         recipe_name: recipe.name,
-        quantity: 1,
-        unit: 'piece',
+        quantity: volumeInfo?.servingCl ?? 1,
+        unit: volumeInfo ? 'cl' : 'piece',
         is_new: false,
       },
     ]);
@@ -81,8 +87,8 @@ export default function RecipeLinker({
       {
         recipe_id: null,
         recipe_name: newRecipeName,
-        quantity: 1,
-        unit: 'piece',
+        quantity: volumeInfo?.servingCl ?? 1,
+        unit: volumeInfo ? 'cl' : 'piece',
         is_new: true,
         create_recipe_name: newRecipeName,
         create_recipe_price: newRecipePrice ?? undefined,

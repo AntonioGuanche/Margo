@@ -10,6 +10,21 @@ import ConfidenceBadge from './ConfidenceBadge';
 import RecipeLinker from './RecipeLinker';
 import type { LineState, IngredientItem } from '../types';
 
+function cleanIngredientName(description: string, _volumeLiters: number | null): string {
+  let name = description;
+  // Remove volume patterns: "50 L", "50L", "0.75L", "20 L IFK"
+  name = name.replace(/\d+([.,]\d+)?\s*[lL](\s|$)/g, ' ');
+  // Remove packaging keywords
+  name = name.replace(/\b(fût|fut|bag in box|bib|ifk|casier|caisse|cs|bac)\b/gi, ' ');
+  // Clean up: trim, collapse spaces, title case
+  name = name.replace(/\s+/g, ' ').trim();
+  name = name
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+  return name || description;
+}
+
 export default function InvoiceLineCard({
   line,
   allIngredients,
@@ -27,9 +42,10 @@ export default function InvoiceLineCard({
   const handleSelectIngredient = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     if (value === '__create__') {
+      const cleaned = cleanIngredientName(line.description, line.volume_liters ?? null);
       setShowCreate(true);
-      setNewName(line.description);
-      onChange({ ingredient_id: null, create_ingredient_name: line.description, ignored: false });
+      setNewName(cleaned);
+      onChange({ ingredient_id: null, create_ingredient_name: cleaned, ignored: false });
     } else if (value === '__ignore__') {
       onChange({ ingredient_id: null, create_ingredient_name: null, ignored: true });
     } else {
@@ -173,6 +189,12 @@ export default function InvoiceLineCard({
                     <option value="2">2cl (shot)</option>
                   </select>
                 </div>
+                {line.total_price != null && line.quantity != null && line.quantity !== 0 && (
+                  <div className="text-[10px] text-emerald-700 font-medium">
+                    💡 sera stocké à{' '}
+                    {(Math.abs(line.total_price) / (Math.abs(line.quantity) * line.volume_liters!)).toFixed(2)} €/l
+                  </div>
+                )}
               </div>
             )}
         </div>
@@ -222,6 +244,9 @@ export default function InvoiceLineCard({
                       ? line.create_ingredient_name
                       : allIngredients.find(i => i.id === line.ingredient_id)?.name ?? 'Ingrédient'}
                   </span>
+                  {line.volume_liters && (
+                    <span className="text-blue-500 text-xs">— en €/l</span>
+                  )}
                   {line.create_ingredient_name && (
                     <span className="text-emerald-600 text-xs flex items-center gap-0.5">
                       <Check size={12} />
@@ -356,6 +381,11 @@ export default function InvoiceLineCard({
               recipeLinks={line.recipe_links}
               recipesList={recipesList}
               lineDescription={line.description}
+              volumeInfo={
+                line.volume_liters && line.suggested_serving_cl
+                  ? { servingCl: line.suggested_serving_cl }
+                  : undefined
+              }
               onChange={(links) => onChange({ recipe_links: links })}
             />
           )}

@@ -213,24 +213,42 @@ export default function InvoiceReview() {
   const handleConfirm = () => {
     const confirmLines = lines
       .filter((l) => !l.ignored)
-      .map((l) => ({
-        description: l.description,
-        ingredient_id: l.ingredient_id,
-        create_ingredient_name: l.create_ingredient_name,
-        unit_price: l.unit_price,
-        unit: l.unit,
-        recipe_links: l.recipe_links
-          .filter((rl) => rl.recipe_id || rl.create_recipe_name)
-          .map((rl) => ({
-            recipe_id: rl.recipe_id ?? undefined,
-            create_recipe_name: rl.create_recipe_name ?? undefined,
-            create_recipe_price: rl.create_recipe_price ?? undefined,
-            create_recipe_category: rl.create_recipe_category ?? undefined,
-            create_recipe_is_homemade: rl.create_recipe_name ? rl.create_recipe_is_homemade : undefined,
-            quantity: rl.quantity,
-            unit: rl.unit,
-          })),
-      }));
+      .map((l) => {
+        let effectiveUnit = l.unit;
+        let effectiveUnitPrice = l.unit_price;
+
+        // Volume-based lines (kegs, BIB, bottles): convert to €/l for proper base unit storage
+        if (
+          l.volume_liters &&
+          l.volume_liters > 0 &&
+          l.total_price != null &&
+          l.quantity != null &&
+          l.quantity !== 0
+        ) {
+          effectiveUnit = 'l';
+          effectiveUnitPrice =
+            Math.abs(l.total_price) / (Math.abs(l.quantity) * l.volume_liters);
+        }
+
+        return {
+          description: l.description,
+          ingredient_id: l.ingredient_id,
+          create_ingredient_name: l.create_ingredient_name,
+          unit_price: effectiveUnitPrice,
+          unit: effectiveUnit,
+          recipe_links: l.recipe_links
+            .filter((rl) => rl.recipe_id || rl.create_recipe_name)
+            .map((rl) => ({
+              recipe_id: rl.recipe_id ?? undefined,
+              create_recipe_name: rl.create_recipe_name ?? undefined,
+              create_recipe_price: rl.create_recipe_price ?? undefined,
+              create_recipe_category: rl.create_recipe_category ?? undefined,
+              create_recipe_is_homemade: rl.create_recipe_name ? rl.create_recipe_is_homemade : undefined,
+              quantity: rl.quantity,
+              unit: rl.unit,
+            })),
+        };
+      });
 
     confirm.mutate(confirmLines, {
       onSuccess: (data) => {
