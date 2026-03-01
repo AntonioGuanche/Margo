@@ -118,21 +118,28 @@ export default function RecipeDetail() {
       <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-100 overflow-hidden">
         {recipe.ingredients.map((ri) => (
           <div key={ri.id} className="px-4 py-3 flex items-center justify-between">
-            <div>
+            <div className="flex items-center gap-2">
               <span className="font-medium text-stone-900">{ri.ingredient_name}</span>
-              <span className="text-sm text-stone-500 ml-2">
+              <span className="text-sm text-stone-500">
                 {ri.quantity} {ri.unit}
               </span>
             </div>
             <div className="text-right">
-              {ri.unit_cost != null && (
-                <p className="text-xs text-stone-400">
-                  {ri.unit_cost.toFixed(2)} €/{ri.unit_cost_unit ?? ri.unit}
-                </p>
+              {ri.unit_cost != null ? (
+                <>
+                  <p className="text-xs text-stone-400">
+                    {ri.unit_cost.toFixed(2)} €/{ri.unit_cost_unit ?? ri.unit}
+                  </p>
+                  <p className="text-sm font-medium text-stone-700">
+                    {ri.line_cost != null ? `${ri.line_cost.toFixed(2)} €` : '—'}
+                  </p>
+                </>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+                  Prix manquant
+                </span>
               )}
-              <p className="text-sm font-medium text-stone-700">
-                {ri.line_cost != null ? `${ri.line_cost.toFixed(2)} €` : '—'}
-              </p>
             </div>
           </div>
         ))}

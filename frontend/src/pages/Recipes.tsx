@@ -47,10 +47,12 @@ function RecipeCard({ recipe, onClick, onDelete }: { recipe: RecipeListItem; onC
         </div>
       </button>
       <div className="flex items-center gap-2 ml-2 shrink-0">
-        {recipe.food_cost_percent != null && (
+        {recipe.food_cost_percent != null ? (
           <span className={`text-sm font-semibold ${colors.text}`}>
             {recipe.food_cost_percent.toFixed(1)}%
           </span>
+        ) : (
+          <span className="text-xs text-amber-600">Incomplet</span>
         )}
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />

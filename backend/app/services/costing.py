@@ -1,5 +1,7 @@
 """Food cost calculation and cascade recalculation service."""
 
+import re
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -24,22 +26,43 @@ UNIT_TO_BASE: dict[str, tuple[str, float]] = {
 }
 
 
+# Regex for packaging formats: "40x100gr", "24x125ml", "36x80gr", "54x55ml", "25X120GR"
+_PACKAGING_RE = re.compile(
+    r'^(\d+)\s*[xX×]\s*(\d+)\s*(g|gr|kg|ml|cl|l)\s*$'
+)
+
+
 def normalize_to_base_unit(unit: str, price: float | None) -> tuple[str, float | None]:
     """Normalize unit and price to base unit (kg, l, piece).
 
     Ingredient prices are ALWAYS stored in base units.
 
-    Examples:
+    Standard units:
         ("g", 0.024)   → ("kg", 24.0)      # 0.024 €/g × 1000 = 24 €/kg
-        ("kg", 24.0)    → ("kg", 24.0)      # already base
-        ("ml", 0.005)   → ("l", 5.0)        # 0.005 €/ml × 1000 = 5 €/l
-        ("cl", 0.05)    → ("l", 5.0)        # 0.05 €/cl × 100 = 5 €/l
-        ("l", 5.0)      → ("l", 5.0)        # already base
-        ("piece", 3.50) → ("piece", 3.50)   # already base
-        ("pce", 3.50)   → ("piece", 3.50)   # alias
-        ("g", None)     → ("kg", None)       # no price, still normalize unit
+        ("kg", 24.0)   → ("kg", 24.0)       # already base
+        ("ml", 0.005)  → ("l", 5.0)         # 0.005 €/ml × 1000 = 5 €/l
+        ("cl", 0.05)   → ("l", 5.0)         # 0.05 €/cl × 100 = 5 €/l
+        ("l", 5.0)     → ("l", 5.0)         # already base
+        ("piece", 3.5) → ("piece", 3.50)    # already base
+
+    Packaging formats (NxM<unit>) → price per piece:
+        ("40x100gr", 20.53) → ("piece", 0.51325)  # 20.53 / 40 = 0.51 €/piece
+        ("24x125ml", 36.48) → ("piece", 1.52)     # 36.48 / 24 = 1.52 €/piece
+        ("54x55ml", 34.55)  → ("piece", 0.6398)   # 34.55 / 54 = 0.64 €/piece
+        ("36x80gr", 37.90)  → ("piece", 1.0528)   # 37.90 / 36 = 1.05 €/piece
     """
     unit = unit.lower().strip()
+
+    # 1. Check packaging format first: "40x100gr" → count × sub-units
+    pkg_match = _PACKAGING_RE.match(unit)
+    if pkg_match:
+        count = int(pkg_match.group(1))
+        # Price per piece = total price / number of pieces
+        if count > 0 and price is not None:
+            return "piece", round(price / count, 6)
+        return "piece", price
+
+    # 2. Standard unit lookup
     info = UNIT_TO_BASE.get(unit)
 
     if info is None:
@@ -51,8 +74,6 @@ def normalize_to_base_unit(unit: str, price: float | None) -> tuple[str, float |
         return unit, price  # Already base unit
 
     # Normalize price: price_per_sub_unit / factor = price_per_base_unit
-    # Example: 0.024 €/g → factor for g is 0.001
-    #          price_per_kg = 0.024 / 0.001 = 24.0
     normalized_price = round(price / factor, 6) if price is not None else None
 
     return base_unit, normalized_price

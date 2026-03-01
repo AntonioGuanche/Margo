@@ -248,7 +248,26 @@ async def recalculate_all_food_costs(
     admin: Restaurant = Depends(get_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Recalculate food cost for ALL recipes across ALL restaurants."""
+    """Fix packaging units on ingredients, then recalculate ALL recipe food costs."""
+    import re
+
+    # Phase 1: Fix ingredients with packaging units (e.g., "40x100gr" → "piece")
+    packaging_re = re.compile(r'^\d+\s*[xX×]\s*\d+\s*(?:g|gr|kg|ml|cl|l)\s*$', re.IGNORECASE)
+
+    result = await db.execute(select(Ingredient))
+    all_ingredients = result.scalars().all()
+
+    ingredients_fixed = 0
+    for ing in all_ingredients:
+        if ing.unit and packaging_re.match(ing.unit):
+            new_unit, new_price = normalize_to_base_unit(ing.unit, ing.current_price)
+            ing.unit = new_unit
+            ing.current_price = new_price
+            ingredients_fixed += 1
+
+    await db.flush()
+
+    # Phase 2: Recalculate all recipes
     result = await db.execute(select(Recipe.id))
     recipe_ids = result.scalars().all()
 
@@ -257,4 +276,4 @@ async def recalculate_all_food_costs(
 
     await db.flush()
 
-    return {"recalculated": len(recipe_ids)}
+    return {"ingredients_fixed": ingredients_fixed, "recalculated": len(recipe_ids)}

@@ -65,6 +65,46 @@ def test_normalize_unknown_unit():
     assert price == 2.0
 
 
+# --- Packaging format tests ---
+
+
+def test_normalize_packaging_unit_weight():
+    """Packaging like 40x100gr should normalize to piece with divided price."""
+    unit, price = normalize_to_base_unit("40x100gr", 20.53)
+    assert unit == "piece"
+    assert price == pytest.approx(0.51325, abs=0.0001)
+
+
+def test_normalize_packaging_unit_volume():
+    """Packaging like 24x125ml should normalize to piece."""
+    unit, price = normalize_to_base_unit("24x125ml", 36.48)
+    assert unit == "piece"
+    assert price == pytest.approx(1.52, abs=0.01)
+
+
+def test_normalize_packaging_case_insensitive():
+    """Packaging patterns should be case-insensitive."""
+    unit, price = normalize_to_base_unit("36X80GR", 37.90)
+    assert unit == "piece"
+    assert price == pytest.approx(1.0528, abs=0.001)
+
+
+def test_normalize_packaging_no_price():
+    """Packaging with no price returns piece unit and None price."""
+    unit, price = normalize_to_base_unit("40x100gr", None)
+    assert unit == "piece"
+    assert price is None
+
+
+def test_normalize_standard_units_unchanged():
+    """Standard units still work after adding packaging support."""
+    assert normalize_to_base_unit("kg", 5.0) == ("kg", 5.0)
+    assert normalize_to_base_unit("g", 0.024) == ("kg", 24.0)
+    assert normalize_to_base_unit("l", 3.05) == ("l", 3.05)
+    assert normalize_to_base_unit("cl", 0.05) == ("l", 5.0)
+    assert normalize_to_base_unit("piece", 1.50) == ("piece", 1.50)
+
+
 # --- Integration: ingredient creation normalizes unit ---
 
 
