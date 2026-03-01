@@ -32,6 +32,7 @@ export default function InvoiceLineCard({
   allIngredients,
   recipesList,
   onChange,
+  useAbsolutePrices,
   onRenameIngredient,
   onRenameRecipe,
 }: {
@@ -39,6 +40,7 @@ export default function InvoiceLineCard({
   allIngredients: IngredientItem[];
   recipesList: { id: number; name: string }[];
   onChange: (updates: Partial<LineState>) => void;
+  useAbsolutePrices?: boolean;
   onRenameIngredient?: (ingredientId: number, newName: string) => Promise<void>;
   onRenameRecipe?: (recipeId: number, newName: string) => Promise<void>;
 }) {
@@ -48,6 +50,11 @@ export default function InvoiceLineCard({
   const [renamingIngredient, setRenamingIngredient] = useState(false);
   const [isRenamingLoading, setIsRenamingLoading] = useState(false);
   const [localIngredientName, setLocalIngredientName] = useState<string | null>(null);
+
+  const displayQty = useAbsolutePrices && line.quantity != null ? Math.abs(line.quantity) : line.quantity;
+  const displayUnitPrice = useAbsolutePrices && line.unit_price != null ? Math.abs(line.unit_price) : line.unit_price;
+  const displayTotal = useAbsolutePrices && line.total_price != null ? Math.abs(line.total_price) : line.total_price;
+
   const handleSelectIngredient = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     if (value === '__create__') {
@@ -125,13 +132,13 @@ export default function InvoiceLineCard({
             </div>
           ) : (
             <div className="flex gap-3 text-sm text-stone-500 mt-0.5">
-              {line.quantity != null && (
+              {displayQty != null && (
                 <span>
-                  {line.quantity} {line.unit ?? ''}
+                  {displayQty} {line.unit ?? ''}
                 </span>
               )}
-              {line.unit_price != null && <span>{line.unit_price.toFixed(2)} €/unité</span>}
-              {line.total_price != null && <span>Total: {line.total_price.toFixed(2)} €</span>}
+              {displayUnitPrice != null && <span>{displayUnitPrice.toFixed(2)} €/unité</span>}
+              {displayTotal != null && <span>Total: {displayTotal.toFixed(2)} €</span>}
             </div>
           )}
 
@@ -139,17 +146,17 @@ export default function InvoiceLineCard({
           {!line.is_manual &&
             line.units_per_package != null &&
             line.units_per_package > 0 &&
-            line.quantity != null &&
-            line.quantity > 0 && (
+            displayQty != null &&
+            displayQty > 0 && (
               <div className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-1 flex items-center gap-1">
                 <span>💡</span>
                 <span>
-                  {line.quantity} {line.unit ?? 'colis'} × {line.units_per_package} ={' '}
-                  {Math.round(line.quantity * line.units_per_package)} unités
-                  {line.total_price != null && (
+                  {displayQty} {line.unit ?? 'colis'} × {line.units_per_package} ={' '}
+                  {Math.round(displayQty * line.units_per_package)} unités
+                  {displayTotal != null && (
                     <>
                       {' '}
-                      → {(line.total_price / (line.quantity * line.units_per_package)).toFixed(2)} €/unité
+                      → {(displayTotal / (displayQty * line.units_per_package)).toFixed(2)} €/unité
                     </>
                   )}
                 </span>
@@ -179,8 +186,9 @@ export default function InvoiceLineCard({
                     onChange={(e) => {
                       const newCl = parseFloat(e.target.value);
                       const newPortions = Math.floor((line.volume_liters! * 100) / newCl);
-                      const newPrice = line.total_price && newPortions > 0
-                        ? line.total_price / newPortions
+                      const effectiveTotal = displayTotal ?? line.total_price;
+                      const newPrice = effectiveTotal && newPortions > 0
+                        ? effectiveTotal / newPortions
                         : null;
                       onChange({
                         suggested_serving_cl: newCl,
@@ -199,10 +207,10 @@ export default function InvoiceLineCard({
                     <option value="2">2cl (shot)</option>
                   </select>
                 </div>
-                {line.total_price != null && line.quantity != null && line.quantity !== 0 && (
+                {displayTotal != null && displayQty != null && displayQty !== 0 && (
                   <div className="text-[10px] text-emerald-700 font-medium">
                     💡 sera stocké à{' '}
-                    {(Math.abs(line.total_price) / (Math.abs(line.quantity) * line.volume_liters!)).toFixed(2)} €/l
+                    {(Math.abs(displayTotal) / (Math.abs(displayQty) * line.volume_liters!)).toFixed(2)} €/l
                   </div>
                 )}
               </div>

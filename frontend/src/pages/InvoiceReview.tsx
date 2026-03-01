@@ -52,6 +52,7 @@ export default function InvoiceReview() {
   const [editSupplier, setEditSupplier] = useState('');
   const [editDate, setEditDate] = useState('');
   const [showIgnored, setShowIgnored] = useState(true);
+  const [useAbsolutePrices, setUseAbsolutePrices] = useState(false);
 
   // Initialize line state from fetched data
   if (invoice && !initialized) {
@@ -79,6 +80,9 @@ export default function InvoiceReview() {
     );
     setEditSupplier(invoice.supplier_name ?? '');
     setEditDate(invoice.invoice_date ?? '');
+    if (invoice.total_amount != null && invoice.total_amount < 0) {
+      setUseAbsolutePrices(true);
+    }
     setInitialized(true);
   }
 
@@ -230,20 +234,30 @@ export default function InvoiceReview() {
     const confirmLines = lines
       .filter((l) => !l.ignored)
       .map((l) => {
-        let effectiveUnit = l.unit;
-        let effectiveUnitPrice = l.unit_price;
+        // Apply absolute values if toggle is on
+        const unitPrice = useAbsolutePrices && l.unit_price != null
+          ? Math.abs(l.unit_price)
+          : l.unit_price;
+        const totalPrice = useAbsolutePrices && l.total_price != null
+          ? Math.abs(l.total_price)
+          : l.total_price;
+        const quantity = useAbsolutePrices && l.quantity != null
+          ? Math.abs(l.quantity)
+          : l.quantity;
 
         // Volume-based lines (kegs, BIB, bottles): convert to €/l for proper base unit storage
+        let effectiveUnit = l.unit;
+        let effectiveUnitPrice = unitPrice;
+
         if (
           l.volume_liters &&
           l.volume_liters > 0 &&
-          l.total_price != null &&
-          l.quantity != null &&
-          l.quantity !== 0
+          totalPrice != null &&
+          quantity != null &&
+          quantity !== 0
         ) {
           effectiveUnit = 'l';
-          effectiveUnitPrice =
-            Math.abs(l.total_price) / (Math.abs(l.quantity) * l.volume_liters);
+          effectiveUnitPrice = Math.abs(totalPrice) / (Math.abs(quantity) * l.volume_liters);
         }
 
         return {
@@ -404,6 +418,25 @@ export default function InvoiceReview() {
             <span className="text-stone-500">Format</span>
             <p className="font-medium text-stone-900 uppercase">{invoice.format}</p>
           </div>
+          {/* Toggle valeur absolue — affiché seulement si des prix négatifs existent */}
+          {lines.some(l => (l.unit_price != null && l.unit_price < 0) || (l.total_price != null && l.total_price < 0)) && (
+            <div className="sm:col-span-2 flex items-center gap-3 pt-2 border-t border-stone-100">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useAbsolutePrices}
+                  onChange={(e) => setUseAbsolutePrices(e.target.checked)}
+                  className="rounded border-stone-300 text-orange-600 focus:ring-orange-500"
+                />
+                <span className="text-sm text-stone-700">
+                  Utiliser les prix en valeur absolue
+                </span>
+              </label>
+              <span className="text-xs text-stone-400">
+                (note de crédit / retour fournisseur)
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -422,6 +455,7 @@ export default function InvoiceReview() {
             allIngredients={allIngredients}
             recipesList={recipesList}
             onChange={(updates) => updateLine(index, updates)}
+            useAbsolutePrices={useAbsolutePrices}
             onRenameIngredient={handleRenameIngredient}
             onRenameRecipe={handleRenameRecipe}
           />
@@ -456,6 +490,7 @@ export default function InvoiceReview() {
                   allIngredients={allIngredients}
                   recipesList={recipesList}
                   onChange={(updates) => updateLine(index, updates)}
+                  useAbsolutePrices={useAbsolutePrices}
                   onRenameIngredient={handleRenameIngredient}
                   onRenameRecipe={handleRenameRecipe}
                 />
