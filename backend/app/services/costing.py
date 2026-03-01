@@ -143,8 +143,8 @@ def get_margin_status(food_cost_percent: float | None, target: float = 30.0) -> 
 async def recalculate_recipe(db: AsyncSession, recipe_id: int) -> None:
     """Recalculate and save food_cost + food_cost_percent for a recipe.
 
-    For homemade recipes: food_cost = sum(quantity * ingredient_price).
-    For bought products (is_homemade=False): food_cost = ingredient's current_price directly.
+    Uses calculate_food_cost() with unit conversion for ALL recipes
+    (both homemade and bought products).
     """
     result = await db.execute(
         select(Recipe)
@@ -156,30 +156,14 @@ async def recalculate_recipe(db: AsyncSession, recipe_id: int) -> None:
     if recipe is None:
         return
 
-    if recipe.is_homemade:
-        # Homemade: sum of (quantity * unit_price) with unit conversion
-        ingredients_with_prices = [
-            (ri.quantity, ri.unit, ri.ingredient.current_price, ri.ingredient.unit)
-            for ri in recipe.recipe_ingredients
-        ]
-        food_cost, food_cost_percent = calculate_food_cost(
-            ingredients_with_prices, recipe.selling_price
-        )
-    else:
-        # Bought product: food_cost = first ingredient's current_price
-        if recipe.recipe_ingredients:
-            price = recipe.recipe_ingredients[0].ingredient.current_price
-            if price is not None:
-                food_cost = round(price, 4)
-                food_cost_percent = (
-                    round((price / recipe.selling_price) * 100, 2)
-                    if recipe.selling_price > 0
-                    else None
-                )
-            else:
-                food_cost, food_cost_percent = None, None
-        else:
-            food_cost, food_cost_percent = None, None
+    # Calculate food cost using unit conversion for ALL recipes
+    ingredients_with_prices = [
+        (ri.quantity, ri.unit, ri.ingredient.current_price, ri.ingredient.unit)
+        for ri in recipe.recipe_ingredients
+    ]
+    food_cost, food_cost_percent = calculate_food_cost(
+        ingredients_with_prices, recipe.selling_price
+    )
 
     recipe.food_cost = food_cost
     recipe.food_cost_percent = food_cost_percent

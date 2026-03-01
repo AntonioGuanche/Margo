@@ -45,6 +45,7 @@ class InvoiceUploadResponse(BaseModel):
     format: str
     status: str = "pending_review"
     raw_text: str | None = None
+    image_url: str | None = None
 
 
 # --- Confirmation ---
@@ -123,6 +124,7 @@ class InvoiceDetailResponse(BaseModel):
     total_amount: float | None = None
     lines: list[InvoiceLineResponse] = []
     raw_text: str | None = None
+    image_url: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

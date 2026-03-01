@@ -223,6 +223,7 @@ async def upload_invoice(
         format=parsed.format,
         status="pending_review",
         raw_text=parsed.raw_text,
+        image_url=invoice.image_url,
     )
 
 
@@ -307,6 +308,7 @@ async def get_invoice(
         total_amount=invoice.total_amount,
         lines=lines,
         raw_text=None,  # Could store in JSONB if needed
+        image_url=invoice.image_url,
         created_at=invoice.created_at,
     )
 
@@ -527,6 +529,7 @@ async def patch_invoice(
         total_amount=invoice.total_amount,
         lines=lines,
         raw_text=None,
+        image_url=invoice.image_url,
         created_at=invoice.created_at,
     )
 

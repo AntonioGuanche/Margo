@@ -226,6 +226,7 @@ export default function RecipeLinker({
             className="w-full border border-blue-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
           >
             <option value="">Choisir une recette...</option>
+            <option value="__create__">+ Créer un nouveau produit</option>
             {recipesList
               .filter((r) => !recipeLinks.some((l) => l.recipe_id === r.id))
               .map((r) => (
@@ -233,7 +234,6 @@ export default function RecipeLinker({
                   {r.name}
                 </option>
               ))}
-            <option value="__create__">+ Créer un nouveau produit</option>
           </select>
         </div>
       ) : (

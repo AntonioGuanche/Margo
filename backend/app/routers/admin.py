@@ -241,3 +241,20 @@ async def admin_normalize_units(
         "recipes_recalculated": len(recipe_ids),
         "details": details,
     }
+
+
+@router.post("/recalculate-all-food-costs")
+async def recalculate_all_food_costs(
+    admin: Restaurant = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Recalculate food cost for ALL recipes across ALL restaurants."""
+    result = await db.execute(select(Recipe.id))
+    recipe_ids = result.scalars().all()
+
+    for recipe_id in recipe_ids:
+        await recalculate_recipe(db, recipe_id)
+
+    await db.flush()
+
+    return {"recalculated": len(recipe_ids)}

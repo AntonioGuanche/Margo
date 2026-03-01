@@ -321,6 +321,7 @@ export default function InvoiceLineCard({
                   className="w-full border border-orange-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 >
                   <option value="">Choisir un autre ingrédient...</option>
+                  <option value="__create__">+ Créer un nouvel ingrédient</option>
                   {line.suggestions.length > 0 && (
                     <optgroup label="Suggestions">
                       {line.suggestions.map((s) => (
@@ -339,7 +340,6 @@ export default function InvoiceLineCard({
                         </option>
                       ))}
                   </optgroup>
-                  <option value="__create__">+ Créer un nouvel ingrédient</option>
                 </select>
               )}
             </>
@@ -351,6 +351,7 @@ export default function InvoiceLineCard({
               className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             >
               <option value="">Choisir un ingrédient...</option>
+              <option value="__create__">+ Créer un nouvel ingrédient</option>
               {line.suggestions.length > 0 && (
                 <optgroup label="Suggestions">
                   {line.suggestions.map((s) => (
@@ -369,7 +370,6 @@ export default function InvoiceLineCard({
                     </option>
                   ))}
               </optgroup>
-              <option value="__create__">+ Créer un nouvel ingrédient</option>
               <option value="__ignore__">Ignorer cette ligne</option>
             </select>
           )}

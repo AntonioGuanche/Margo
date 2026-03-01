@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import {
   ArrowLeft,
   FileCheck,
+  FileText,
   Check,
   Plus,
   Loader2,
@@ -418,6 +419,20 @@ export default function InvoiceReview() {
             <span className="text-stone-500">Format</span>
             <p className="font-medium text-stone-900 uppercase">{invoice.format}</p>
           </div>
+          {invoice.image_url && (
+            <div>
+              <span className="text-stone-500">Document</span>
+              <a
+                href={`/${invoice.image_url}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-sm font-medium text-orange-700 hover:text-orange-800 hover:underline"
+              >
+                <FileText size={14} />
+                Voir l'original
+              </a>
+            </div>
+          )}
           {/* Toggle valeur absolue — affiché seulement si des prix négatifs existent */}
           {lines.some(l => (l.unit_price != null && l.unit_price < 0) || (l.total_price != null && l.total_price < 0)) && (
             <div className="sm:col-span-2 flex items-center gap-3 pt-2 border-t border-stone-100">

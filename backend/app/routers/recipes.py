@@ -207,21 +207,15 @@ async def create_recipe(
                 detail=f"Ingrédients introuvables: {sorted(missing)}",
             )
 
-    # Calculate food cost
+    # Calculate food cost using unit conversion for ALL recipes
     food_cost: float | None = None
     food_cost_percent: float | None = None
-    if data.is_homemade:
+    if data.ingredients:
         ingredients_with_prices = [
             (ri.quantity, ri.unit, found_ingredients[ri.ingredient_id].current_price, found_ingredients[ri.ingredient_id].unit)
             for ri in data.ingredients
         ]
         food_cost, food_cost_percent = calculate_food_cost(ingredients_with_prices, data.selling_price)
-    elif data.ingredients:
-        # Bought product: food_cost = first ingredient's price
-        price = found_ingredients[data.ingredients[0].ingredient_id].current_price
-        if price is not None:
-            food_cost = round(price, 4)
-            food_cost_percent = round((price / data.selling_price) * 100, 2) if data.selling_price > 0 else None
 
     # Create recipe
     recipe = Recipe(

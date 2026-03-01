@@ -37,6 +37,7 @@ export interface InvoiceUploadResponse {
   format: string;
   status: string;
   raw_text: string | null;
+  image_url: string | null;
 }
 
 export interface InvoiceListItem {
@@ -67,6 +68,7 @@ export interface InvoiceDetailResponse {
   total_amount: number | null;
   lines: InvoiceLineResponse[];
   raw_text: string | null;
+  image_url: string | null;
   created_at: string;
 }
 

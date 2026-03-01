@@ -451,3 +451,39 @@ async def test_cross_restaurant_isolation(client: AsyncClient, db_session, auth_
     # List should be empty for the other restaurant
     response = await client.get("/api/recipes", headers=other_headers)
     assert response.json()["total"] == 0
+
+
+async def test_food_cost_non_homemade_with_unit_conversion(
+    client: AsyncClient, auth_headers: dict, db_session, restaurant
+):
+    """Bought product with volume ingredient should use unit conversion."""
+    # Create ingredient at 3.05 €/l (like Stella Artois)
+    stella = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Stella Artois",
+        unit="l",
+        current_price=3.05,
+    )
+    db_session.add(stella)
+    await db_session.flush()
+    await db_session.refresh(stella)
+
+    # Create non-homemade recipe: 25cl serving, sold at 3.00€
+    payload = {
+        "name": "Stella Artois 25cL",
+        "selling_price": 3.00,
+        "is_homemade": False,
+        "ingredients": [
+            {"ingredient_id": stella.id, "quantity": 25, "unit": "cl"},
+        ],
+    }
+    resp = await client.post("/api/recipes", json=payload, headers=auth_headers)
+    assert resp.status_code == 201
+    data = resp.json()
+
+    # 25cl → 0.25l × 3.05 €/l = 0.7625€ ≈ 0.76
+    assert data["food_cost"] is not None
+    assert abs(data["food_cost"] - 0.7625) < 0.01
+    # food_cost_percent = 0.7625 / 3.00 * 100 ≈ 25.42
+    assert data["food_cost_percent"] is not None
+    assert abs(data["food_cost_percent"] - 25.42) < 0.5
