@@ -351,24 +351,47 @@ async def confirm_invoice(
 
         # Create new ingredient if requested
         if line.create_ingredient_name:
-            raw_unit = line.unit or "kg"
-            base_unit, base_price = normalize_to_base_unit(raw_unit, line.unit_price)
-            new_ingredient = Ingredient(
-                restaurant_id=restaurant.id,
-                name=line.create_ingredient_name,
-                unit=base_unit,
-                current_price=base_price,
-                supplier_name=invoice.supplier_name,
-                category=guess_ingredient_category(line.create_ingredient_name),
-                last_updated=dt.datetime.now(dt.timezone.utc).replace(tzinfo=None),
-            )
-            db.add(new_ingredient)
-            await db.flush()
-            await db.refresh(new_ingredient)
-            ingredient_id = new_ingredient.id
-            ingredients_created += 1
+            clean_name = line.create_ingredient_name.strip()
 
-            # Save alias for the new ingredient
+            # Check if ingredient with this name already exists (case-insensitive)
+            existing_result = await db.execute(
+                select(Ingredient).where(
+                    Ingredient.restaurant_id == restaurant.id,
+                    func.lower(Ingredient.name) == clean_name.lower(),
+                )
+            )
+            existing_ingredient = existing_result.scalar_one_or_none()
+
+            if existing_ingredient:
+                # Reuse existing ingredient — update price if available
+                ingredient_id = existing_ingredient.id
+                if line.unit_price is not None:
+                    raw_unit = line.unit or "kg"
+                    _, base_price = normalize_to_base_unit(raw_unit, line.unit_price)
+                    existing_ingredient.current_price = base_price
+                    existing_ingredient.last_updated = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+                    if invoice.supplier_name:
+                        existing_ingredient.supplier_name = invoice.supplier_name
+            else:
+                # Create new ingredient
+                raw_unit = line.unit or "kg"
+                base_unit, base_price = normalize_to_base_unit(raw_unit, line.unit_price)
+                new_ingredient = Ingredient(
+                    restaurant_id=restaurant.id,
+                    name=clean_name,
+                    unit=base_unit,
+                    current_price=base_price,
+                    supplier_name=invoice.supplier_name,
+                    category=guess_ingredient_category(clean_name),
+                    last_updated=dt.datetime.now(dt.timezone.utc).replace(tzinfo=None),
+                )
+                db.add(new_ingredient)
+                await db.flush()
+                await db.refresh(new_ingredient)
+                ingredient_id = new_ingredient.id
+                ingredients_created += 1
+
+            # Save alias
             await save_alias(db, restaurant.id, line.description, ingredient_id)
             aliases_saved += 1
 

@@ -751,6 +751,80 @@ async def test_delete_confirmed_with_price_history(
     assert ph_rows[0].invoice_id is None
 
 
+async def test_confirm_duplicate_ingredient_name(
+    client, auth_headers, db_session, restaurant, xml_file_path
+):
+    """Confirm with create_ingredient_name that already exists (trailing space) → reuse, no crash.
+
+    Regression test for Sprint 43b: UniqueViolationError when create_ingredient_name
+    has trailing space and ingredient with same trimmed name already exists.
+    """
+    from sqlalchemy import select, func
+
+    # Create existing ingredient "Poulycroc"
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Poulycroc",
+        unit="piece",
+        current_price=5.0,
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    # Count ingredients before
+    count_before = (
+        await db_session.execute(
+            select(func.count(Ingredient.id)).where(
+                Ingredient.restaurant_id == restaurant.id
+            )
+        )
+    ).scalar()
+
+    # Upload
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    # Confirm with trailing space — should NOT crash
+    confirm_resp = await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={
+            "lines": [
+                {
+                    "description": "Poulycroc casier",
+                    "create_ingredient_name": "Poulycroc ",
+                    "unit_price": 6.50,
+                    "unit": "piece",
+                },
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert confirm_resp.status_code == 200
+    data = confirm_resp.json()
+    # Should reuse existing, not create new
+    assert data["ingredients_created"] == 0
+
+    # Count ingredients after — should be same
+    count_after = (
+        await db_session.execute(
+            select(func.count(Ingredient.id)).where(
+                Ingredient.restaurant_id == restaurant.id
+            )
+        )
+    ).scalar()
+    assert count_after == count_before
+
+    # Price of existing ingredient should be updated
+    await db_session.refresh(ingredient)
+    assert ingredient.current_price == 6.50
+
+
 async def test_invoices_protected(client):
     """Without auth token → 401."""
     resp = await client.get("/api/invoices")
