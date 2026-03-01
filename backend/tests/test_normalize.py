@@ -105,6 +105,66 @@ def test_normalize_standard_units_unchanged():
     assert normalize_to_base_unit("piece", 1.50) == ("piece", 1.50)
 
 
+# --- Belgian brewery packaging volume tests ---
+
+from app.services.unit_parser import parse_packaging_volume
+
+
+def test_parse_packaging_belgian_notation():
+    """24/3 = 24 bottles of 33cl."""
+    result = parse_packaging_volume("CHOUFFE BLONDE 24/3")
+    assert result is not None
+    assert result["units"] == 24
+    assert result["cl_per_unit"] == 33
+    assert result["total_volume_liters"] == pytest.approx(7.92)
+
+
+def test_parse_packaging_50cl():
+    """24/5 = 24 bottles of 50cl."""
+    result = parse_packaging_volume("PEPSI COLA 24/5")
+    assert result is not None
+    assert result["units"] == 24
+    assert result["cl_per_unit"] == 50
+    assert result["total_volume_liters"] == pytest.approx(12.0)
+
+
+def test_parse_packaging_75cl():
+    """6/75 = 6 bottles of 75cl."""
+    result = parse_packaging_volume("VIN ROUGE 6/75")
+    assert result is not None
+    assert result["units"] == 6
+    assert result["cl_per_unit"] == 75
+    assert result["total_volume_liters"] == pytest.approx(4.5)
+
+
+def test_parse_packaging_explicit_format():
+    """12x33cl explicit notation."""
+    result = parse_packaging_volume("JUPILER 12x33cl")
+    assert result is not None
+    assert result["units"] == 12
+    assert result["cl_per_unit"] == 33
+    assert result["total_volume_liters"] == pytest.approx(3.96)
+
+
+def test_parse_packaging_spa():
+    """28/4 = 28 bottles of 40cl."""
+    result = parse_packaging_volume("SPA BARISART 28/4")
+    assert result is not None
+    assert result["units"] == 28
+    assert result["cl_per_unit"] == 40
+    assert result["total_volume_liters"] == pytest.approx(11.2)
+
+
+def test_parse_packaging_keg_ignored():
+    """Kegs should return None."""
+    assert parse_packaging_volume("STELLA ARTOIS 20L FÛT") is None
+
+
+def test_parse_packaging_no_pattern():
+    """Non-packaging items should return None."""
+    assert parse_packaging_volume("FRITES SURGELEES 2.5KG") is None
+
+
 # --- Integration: ingredient creation normalizes unit ---
 
 

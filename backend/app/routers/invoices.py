@@ -35,6 +35,7 @@ from app.services.matching import match_invoice_lines, save_alias
 from app.services.unit_parser import (
     SERVING_SIZES,
     guess_serving_type,
+    parse_packaging_volume,
     parse_units_per_package,
     parse_volume_liters,
 )
@@ -62,14 +63,24 @@ def _compute_portion_fields(
     total_price: float | None,
     units_per_package: int | None,
 ) -> dict:
-    """Compute volume-based portion fields for a line (only if no units_per_package)."""
-    if units_per_package:
-        return {}
-    volume = parse_volume_liters(description)
-    serving_type = guess_serving_type(description)
-    if volume and serving_type:
-        serving_cl = SERVING_SIZES[serving_type]
-        portions = int(volume * 100 / serving_cl)
+    """Compute volume and portion fields for a line.
+
+    Two paths:
+    1. Packaging with volume (24/3, 6x25cl): compute total volume from packaging
+    2. Bulk volume (20L fût, BIB 5L): compute volume from description
+    """
+    # Path 1: Packaging with volume info (casiers, packs)
+    pkg = parse_packaging_volume(description)
+    if pkg:
+        volume = pkg["total_volume_liters"]
+        serving_type = guess_serving_type(description)
+        if serving_type:
+            serving_cl = SERVING_SIZES[serving_type]
+        else:
+            # Default to the per-unit size from packaging
+            serving_cl = pkg["cl_per_unit"]
+
+        portions = int(volume * 100 / serving_cl) if serving_cl > 0 else 0
         price_per_portion = (
             total_price / portions if portions > 0 and total_price else None
         )
@@ -80,6 +91,25 @@ def _compute_portion_fields(
             "suggested_portions": portions,
             "price_per_portion": round(price_per_portion, 4) if price_per_portion else None,
         }
+
+    # Path 2: Bulk volume (kegs, BIB) — only if no packaging
+    if not units_per_package:
+        volume = parse_volume_liters(description)
+        serving_type = guess_serving_type(description)
+        if volume and serving_type:
+            serving_cl = SERVING_SIZES[serving_type]
+            portions = int(volume * 100 / serving_cl)
+            price_per_portion = (
+                total_price / portions if portions > 0 and total_price else None
+            )
+            return {
+                "volume_liters": volume,
+                "serving_type": serving_type,
+                "suggested_serving_cl": serving_cl,
+                "suggested_portions": portions,
+                "price_per_portion": round(price_per_portion, 4) if price_per_portion else None,
+            }
+
     return {}
 
 

@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +13,7 @@ from app.models.ingredient import Ingredient
 from app.models.invoice import Invoice
 from app.models.recipe import Recipe
 from app.models.restaurant import Restaurant
-from app.services.costing import normalize_to_base_unit, recalculate_recipe
+from app.services.costing import normalize_to_base_unit, recalculate_recipe, recalculate_recipes_for_ingredient
 
 router = APIRouter()
 
@@ -277,3 +277,53 @@ async def recalculate_all_food_costs(
     await db.flush()
 
     return {"ingredients_fixed": ingredients_fixed, "recalculated": len(recipe_ids)}
+
+
+@router.post("/ingredients/{ingredient_id}/fix-package-price")
+async def fix_ingredient_package_price(
+    ingredient_id: int,
+    units_in_package: int = Query(..., ge=2, le=100),
+    volume_cl_per_unit: int | None = Query(None, ge=1, le=200),
+    admin: Restaurant = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Fix an ingredient whose price is the whole package price instead of per-unit.
+
+    If volume_cl_per_unit is provided, converts to €/l.
+    Otherwise, divides price by units and keeps as piece.
+    """
+    result = await db.execute(
+        select(Ingredient).where(Ingredient.id == ingredient_id)
+    )
+    ingredient = result.scalar_one_or_none()
+    if not ingredient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingrédient introuvable")
+
+    if ingredient.current_price is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pas de prix à corriger")
+
+    old_price = ingredient.current_price
+    old_unit = ingredient.unit
+
+    if volume_cl_per_unit:
+        # Convert to €/l: price / (units × cl/100)
+        total_liters = units_in_package * volume_cl_per_unit / 100
+        ingredient.current_price = round(old_price / total_liters, 6)
+        ingredient.unit = "l"
+    else:
+        # Just divide by units
+        ingredient.current_price = round(old_price / units_in_package, 6)
+
+    await db.flush()
+
+    # Recalculate all recipes using this ingredient
+    await recalculate_recipes_for_ingredient(db, ingredient_id)
+    await db.flush()
+
+    return {
+        "ingredient": ingredient.name,
+        "old_price": old_price,
+        "old_unit": old_unit,
+        "new_price": ingredient.current_price,
+        "new_unit": ingredient.unit,
+    }

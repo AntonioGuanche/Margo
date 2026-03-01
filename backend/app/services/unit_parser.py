@@ -16,6 +16,82 @@ PACKAGE_PATTERNS = [
 BULK_KEYWORDS = ['fût', 'fut', 'bag in box', 'bib', 'vrac', 'citerne', 'cuve']
 
 
+# Mapping for single-digit Belgian brewery notation
+FRACTION_TO_CL: dict[int, int] = {
+    2: 25,   # /2 → 25cl (quart)
+    3: 33,   # /3 → 33cl (tiers)
+    4: 40,   # /4 → 40cl
+    5: 50,   # /5 → 50cl (demi)
+    7: 75,   # /7 → 75cl
+}
+
+
+def parse_packaging_volume(description: str) -> dict | None:
+    """Parse Belgian brewery packaging notation to extract count AND volume per unit.
+
+    Returns dict with units, cl_per_unit, total_volume_liters, or None.
+
+    Examples:
+        "CHOUFFE BLONDE 24/3" → {units: 24, cl_per_unit: 33, total_volume_liters: 7.92}
+        "PEPSI COLA 24/5"     → {units: 24, cl_per_unit: 50, total_volume_liters: 12.0}
+        "6/75"                → {units: 6,  cl_per_unit: 75, total_volume_liters: 4.5}
+        "SPA BARISART 28/4"   → {units: 28, cl_per_unit: 40, total_volume_liters: 11.2}
+        "6x25cl"              → {units: 6,  cl_per_unit: 25, total_volume_liters: 1.5}
+        "12x33cl"             → {units: 12, cl_per_unit: 33, total_volume_liters: 3.96}
+        "STELLA ARTOIS 20L"   → None (keg — handled by parse_volume_liters)
+        "FRITES SURGELEES"    → None (no packaging)
+    """
+    desc_lower = description.lower()
+
+    # Skip bulk items
+    if any(kw in desc_lower for kw in BULK_KEYWORDS):
+        return None
+
+    # Pattern 1: "24/3", "6/75", "28/4" — Belgian brewery notation
+    match = re.search(r'(\d+)\s*/\s*(\d+)(?:\s|$|[^a-z0-9])', desc_lower)
+    if match:
+        units = int(match.group(1))
+        second = int(match.group(2))
+
+        if not (4 <= units <= 48):
+            return None
+
+        # Determine cl per unit
+        if second <= 9:
+            cl_per_unit = FRACTION_TO_CL.get(second)
+            if cl_per_unit is None:
+                return None
+        elif 20 <= second <= 99:
+            cl_per_unit = second  # Already in cl
+        else:
+            return None
+
+        total_liters = round(units * cl_per_unit / 100, 4)
+        return {
+            "units": units,
+            "cl_per_unit": cl_per_unit,
+            "total_volume_liters": total_liters,
+        }
+
+    # Pattern 2: "6x25cl", "12x33cl", "24x50cl" — explicit format
+    match = re.search(r'(\d+)\s*[xX×]\s*(\d+)\s*cl', desc_lower)
+    if match:
+        units = int(match.group(1))
+        cl_per_unit = int(match.group(2))
+
+        if not (4 <= units <= 48) or not (15 <= cl_per_unit <= 100):
+            return None
+
+        total_liters = round(units * cl_per_unit / 100, 4)
+        return {
+            "units": units,
+            "cl_per_unit": cl_per_unit,
+            "total_volume_liters": total_liters,
+        }
+
+    return None
+
+
 def parse_units_per_package(description: str) -> int | None:
     """Extract units_per_package from a line description.
 
