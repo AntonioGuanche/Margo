@@ -132,6 +132,9 @@ export interface LineState {
   suggestions: IngredientSuggestion[];
   is_manual: boolean;
   recipe_links: RecipeLinkState[];
+  // User-editable packaging override
+  packaging_units: number | null;
+  packaging_cl_per_unit: number | null;
 }
 
 export type IngredientItem = { id: number; name: string };

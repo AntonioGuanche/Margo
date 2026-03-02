@@ -77,6 +77,8 @@ export default function InvoiceReview() {
         suggestions: l.suggestions,
         is_manual: false,
         recipe_links: [],
+        packaging_units: null,
+        packaging_cl_per_unit: null,
       })),
     );
     setEditSupplier(invoice.supplier_name ?? '');
@@ -219,6 +221,8 @@ export default function InvoiceReview() {
         suggestions: [],
         is_manual: true,
         recipe_links: [],
+        packaging_units: null,
+        packaging_cl_per_unit: null,
       },
     ]);
   }, []);

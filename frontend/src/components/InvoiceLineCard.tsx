@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import ConfidenceBadge from './ConfidenceBadge';
 import QuickRenameModal from './QuickRenameModal';
+import PackagingEditor from './PackagingEditor';
 import RecipeLinker from './RecipeLinker';
 import type { LineState, IngredientItem } from '../types';
 
@@ -142,79 +143,27 @@ export default function InvoiceLineCard({
             </div>
           )}
 
-          {/* Conversion conditionnement → unités */}
-          {!line.is_manual &&
-            line.units_per_package != null &&
-            line.units_per_package > 0 &&
-            displayQty != null &&
-            displayQty > 0 && (
-              <div className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-1 flex items-center gap-1">
-                <span>💡</span>
-                <span>
-                  {displayQty} {line.unit ?? 'colis'} × {line.units_per_package} ={' '}
-                  {Math.round(displayQty * line.units_per_package)} unités
-                  {displayTotal != null && (
-                    <>
-                      {' '}
-                      → {(displayTotal / (displayQty * line.units_per_package)).toFixed(2)} €/unité
-                    </>
-                  )}
-                </span>
-              </div>
-            )}
-
-          {/* Portion calculation from volume (kegs, BIB, bottles) */}
-          {!line.is_manual &&
-            line.volume_liters != null &&
-            line.suggested_portions != null &&
-            line.suggested_portions > 0 && (
-              <div className="text-xs bg-blue-50 rounded-lg px-2 py-1.5 mt-1 space-y-1">
-                <div className="flex items-center gap-1 text-blue-700">
-                  <span>🍺</span>
-                  <span>
-                    {line.volume_liters}L ÷ {line.suggested_serving_cl}cl
-                    = <strong>{line.suggested_portions} portions</strong>
-                    {line.price_per_portion != null && (
-                      <> → <strong>{line.price_per_portion.toFixed(2)} €/portion</strong></>
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-blue-600">
-                  <span className="text-[10px]">Taille service :</span>
-                  <select
-                    value={line.suggested_serving_cl ?? 25}
-                    onChange={(e) => {
-                      const newCl = parseFloat(e.target.value);
-                      const newPortions = Math.floor((line.volume_liters! * 100) / newCl);
-                      const effectiveTotal = displayTotal ?? line.total_price;
-                      const newPrice = effectiveTotal && newPortions > 0
-                        ? effectiveTotal / newPortions
-                        : null;
-                      onChange({
-                        suggested_serving_cl: newCl,
-                        suggested_portions: newPortions,
-                        price_per_portion: newPrice,
-                      });
-                    }}
-                    className="text-xs border border-blue-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-                  >
-                    <option value="25">25cl (bière)</option>
-                    <option value="33">33cl (bière)</option>
-                    <option value="50">50cl (pinte)</option>
-                    <option value="12.5">12.5cl (vin)</option>
-                    <option value="15">15cl (vin)</option>
-                    <option value="4">4cl (alcool)</option>
-                    <option value="2">2cl (shot)</option>
-                  </select>
-                </div>
-                {displayTotal != null && displayQty != null && displayQty !== 0 && (
-                  <div className="text-[10px] text-emerald-700 font-medium">
-                    💡 sera stocké à{' '}
-                    {(Math.abs(displayTotal) / (Math.abs(displayQty) * line.volume_liters!)).toFixed(2)} €/l
-                  </div>
-                )}
-              </div>
-            )}
+          {/* Packaging editor — for all non-manual, non-ignored lines */}
+          {!line.is_manual && !line.ignored && (
+            <PackagingEditor
+              detectedUnits={line.units_per_package}
+              detectedClPerUnit={
+                line.volume_liters && line.units_per_package
+                  ? Math.round(line.volume_liters * 100 / line.units_per_package)
+                  : null
+              }
+              detectedVolumeLiters={line.volume_liters}
+              packagingUnits={line.packaging_units}
+              packagingClPerUnit={line.packaging_cl_per_unit}
+              totalPrice={line.total_price}
+              quantity={line.quantity}
+              onChange={(updates) => onChange({
+                packaging_units: updates.packaging_units,
+                packaging_cl_per_unit: updates.packaging_cl_per_unit,
+                volume_liters: updates.volume_liters,
+              })}
+            />
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
