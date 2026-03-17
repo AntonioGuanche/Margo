@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 stripe.api_key = settings.stripe_secret_key
 
 PLAN_LIMITS: dict[str, dict[str, int | None]] = {
-    "free": {"max_recipes": None, "max_invoices_per_month": None},  # TODO: revert to 5/3 after field testing
+    "free": {"max_recipes": 10, "max_invoices_per_month": 5},
     "pro": {"max_recipes": None, "max_invoices_per_month": None},
     "multi": {"max_recipes": None, "max_invoices_per_month": None},
 }

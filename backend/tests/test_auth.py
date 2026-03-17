@@ -1,6 +1,7 @@
 """Tests for authentication endpoints."""
 
 from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, patch
 
 import jwt
 from httpx import AsyncClient
@@ -117,6 +118,36 @@ async def test_verify_wrong_type_token(client: AsyncClient) -> None:
 
     response = await client.post("/auth/verify", json={"token": wrong_token})
     assert response.status_code == 401
+
+
+async def test_login_sends_magic_link_email(client: AsyncClient) -> None:
+    """Login endpoint should attempt to send email via Resend."""
+    with patch("app.services.email.send_magic_link_email", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = True
+        response = await client.post("/auth/login", json={"email": "test@example.com"})
+        assert response.status_code == 200
+        assert response.json()["message"] == "Lien de connexion envoyé par email"
+        mock_send.assert_called_once()
+        # Verify the email and magic link were passed
+        call_args = mock_send.call_args
+        assert call_args[0][0] == "test@example.com"
+        assert "/auth/callback?token=" in call_args[0][1]
+
+
+async def test_login_succeeds_even_if_email_fails(client: AsyncClient) -> None:
+    """Login should still return 200 even if email sending fails."""
+    with patch("app.services.email.send_magic_link_email", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = False
+        response = await client.post("/auth/login", json={"email": "test@example.com"})
+        assert response.status_code == 200  # Don't expose email failures to user
+
+
+async def test_send_magic_link_no_api_key(monkeypatch) -> None:
+    """Without API key, should fallback to console logging."""
+    monkeypatch.setattr("app.services.email.settings.resend_api_key", "")
+    from app.services.email import send_magic_link_email
+    result = await send_magic_link_email("test@test.com", "https://heymargo.be/auth/callback?token=abc")
+    assert result is True  # Returns True (fallback to console)
 
 
 async def test_health_still_public(client: AsyncClient) -> None:

@@ -19,16 +19,19 @@ router = APIRouter()
 
 @router.post("/login", response_model=LoginResponse)
 async def login(request: LoginRequest) -> LoginResponse:
-    """Send a magic link to the user's email.
-
-    For now, the link is logged to the console (Resend integration later).
-    """
+    """Send a magic link to the user's email via Resend."""
     token = create_magic_token(request.email)
     magic_link = f"{settings.frontend_url}/auth/callback?token={token}"
 
-    # TODO: Replace with Resend email sending (Sprint 5)
-    logger.info(f"Magic link for {request.email}: {magic_link}")
-    print(f"\n{'='*60}\n  MAGIC LINK: {magic_link}\n{'='*60}\n")
+    # Always log for debugging (Railway logs)
+    logger.info(f"Magic link requested for {request.email}")
+
+    # Send email via Resend
+    from app.services.email import send_magic_link_email
+    sent = await send_magic_link_email(request.email, magic_link)
+
+    if not sent:
+        logger.warning(f"Email sending failed for {request.email}, link logged to console")
 
     return LoginResponse(message="Lien de connexion envoyé par email")
 

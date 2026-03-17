@@ -56,8 +56,8 @@ async def test_get_plan_free(client: AsyncClient, auth_headers: dict, restaurant
     assert resp.status_code == 200
     data = resp.json()
     assert data["current_plan"] == "free"
-    assert data["max_recipes"] is None  # unlimited during field testing
-    assert data["max_invoices_per_month"] is None  # unlimited during field testing
+    assert data["max_recipes"] == 10
+    assert data["max_invoices_per_month"] == 5
     assert data["current_recipes"] == 0
     assert data["current_invoices_this_month"] == 0
     assert data["can_manage_billing"] is False

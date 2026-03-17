@@ -48,6 +48,7 @@ margo/
 │   │   │   ├── unit_parser.py # parse_units_per_package, parse_volume_liters, SERVING_SIZES
 │   │   │   ├── utils.py       # guess_ingredient_category (Belgian keywords)
 │   │   │   ├── onboarding_ai.py # Claude menu extraction + ingredient suggestion
+│   │   │   ├── email.py         # Magic link email sending via Resend API
 │   │   │   ├── email_inbound.py # Resend webhook for factures@heymargo.be
 │   │   │   └── storage.py     # R2 upload with presigned URLs
 │   │   └── middleware/
@@ -142,7 +143,7 @@ Additional: **IngredientAlias** — alias_text, ingredient_id (learned mapping f
 - **PackagingEditor:** `components/PackagingEditor.tsx` — unified editable block replacing old separate banners. Auto-filled from `parse_packaging_volume`, user can edit (Nb × cl) with live €/l preview. Quick presets (24×33, 24×25, 24×50, 12×75). Updates `volume_liters` in LineState → `handleConfirm` converts to €/l. `LineState` has `packaging_units` and `packaging_cl_per_unit` for user overrides.
 - **Onboarding:** photo/PDF of menu → AI extracts dishes (with cocktail category) → AI suggests ingredients (homemade only) → purchased items auto-get ingredient = product name (qty 1, unit piece) → batch creation
 - **Cocktail detection:** `is_cocktail()` in utils.py + `isCocktail()` in Onboarding.tsx detect cocktails by name/keywords → marked homemade (has sub-ingredients). Non-cocktail boissons → purchased.
-- **Plan limits:** free = unlimited (temporarily, revert to 5 recipes / 3 invoices/month after field testing). Pro/Multi = unlimited.
+- **Plan limits:** free = 10 recipes / 5 invoices per month. Pro/Multi = unlimited.
 
 ## Important patterns
 
@@ -190,7 +191,7 @@ See `.env.example` for required vars: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KE
 
 ## Current sprint
 
-Sprint 44 — PackagingEditor composant sur la review de facture. Remplace les deux bandeaux séparés (ambre units_per_package + bleu volume) par un bloc unique éditable. Auto-rempli par parse_packaging_volume, l'utilisateur peut modifier ou ajouter manuellement le conditionnement (Nb × cl). Presets rapides (24×33, 24×25, 24×50, 12×75). Le volume_liters est mis à jour dans le LineState → handleConfirm convertit automatiquement en €/l. Fonctionne pour tout utilisateur lambda sans comprendre la logique technique.
+Sprint 45 — Envoi réel des magic links via Resend API (httpx POST, fallback console si pas d'API key). Email HTML avec bouton orange "Se connecter", expiration affichée. Service `email.py` séparé de auth.py. Plan limits réactivés : free = 10 recettes / 5 factures par mois (None → 10/5). Tests : mock envoi email + fallback sans API key.
 
 ### Sprint history
-Previous: Sprint 43d (parse notation brasserie belge 24/3), Sprint 43c (parse emballages NxMunit + prix manquant), Sprint 43b (fix crash doublon ingrédient), Sprint 43 (fix food cost non-homemade + PDF link + dropdown UX), Sprint 42 (toggle valeur absolue notes de crédit), Sprint 41 (quick rename ingredient/recipe from invoice), Sprint 40 (cascade delete ingredient), Sprint 39 (volume lines €/l en frontend), Sprint 38 (onboarding confirm crash + proxy vite + utcnow + invoice delete FK-safe), Sprint 37 (reset DB depuis Paramètres + retrait fix-inflated-prices), Sprint 36 (fix-inflated-prices + sidebar sticky), Sprint 35 (admin panel + query limit 500), Sprint 34 (normalisation unités — migration avec sur-inflation), Sprint 33 (P4 types partagés), Sprint 32 (P3 fiabilité), Sprint 31 (P2 navigation), Sprint 30 (hardening P0+P1), Sprint 29b (unit sync on confirm), Sprint 29 (unit conversion), Sprint 28b (batch recipe pre-fill), Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component), Sprint 25 (ingredient chips). See @PLAN.md for original roadmap.
+Previous: Sprint 44 (PackagingEditor composant éditable sur invoice review), Sprint 43d (parse notation brasserie belge 24/3), Sprint 43c (parse emballages NxMunit + prix manquant), Sprint 43b (fix crash doublon ingrédient), Sprint 43 (fix food cost non-homemade + PDF link + dropdown UX), Sprint 42 (toggle valeur absolue notes de crédit), Sprint 41 (quick rename ingredient/recipe from invoice), Sprint 40 (cascade delete ingredient), Sprint 39 (volume lines €/l en frontend), Sprint 38 (onboarding confirm crash + proxy vite + utcnow + invoice delete FK-safe), Sprint 37 (reset DB depuis Paramètres + retrait fix-inflated-prices), Sprint 36 (fix-inflated-prices + sidebar sticky), Sprint 35 (admin panel + query limit 500), Sprint 34 (normalisation unités — migration avec sur-inflation), Sprint 33 (P4 types partagés), Sprint 32 (P3 fiabilité), Sprint 31 (P2 navigation), Sprint 30 (hardening P0+P1), Sprint 29b (unit sync on confirm), Sprint 29 (unit conversion), Sprint 28b (batch recipe pre-fill), Sprint 28 (autoSuggested reset), Sprint 27 (re-confirm/patch/delete confirmed invoices), Sprint 26 (RecipeLinker chip component), Sprint 25 (ingredient chips). See @PLAN.md for original roadmap.
