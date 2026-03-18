@@ -1176,6 +1176,140 @@ async def test_confirm_saves_recipe_links_in_jsonb(
     assert found_line["confirmed_recipe_links"][0]["recipe_id"] == recipe.id
 
 
+async def test_confirm_casier_stores_price_per_piece(
+    client, auth_headers, db_session, restaurant, xml_file_path
+):
+    """Casier 24 bouteilles: confirm with unit=piece → price = total / (qty × 24) per piece."""
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Jupiler",
+        unit="piece",
+        current_price=None,
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    recipe = Recipe(
+        restaurant_id=restaurant.id,
+        name="Jupiler 40cL",
+        selling_price=2.50,
+    )
+    db_session.add(recipe)
+    await db_session.flush()
+    await db_session.refresh(recipe)
+
+    ri = RecipeIngredient(
+        recipe_id=recipe.id,
+        ingredient_id=ingredient.id,
+        quantity=1,
+        unit="piece",
+    )
+    db_session.add(ri)
+    await db_session.flush()
+
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    # Frontend sends: unit=piece, unit_price = 26.16 / (2 × 24) = 0.545
+    confirm_resp = await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={
+            "lines": [
+                {
+                    "description": "JUPILER PILS 24/4",
+                    "ingredient_id": ingredient.id,
+                    "unit_price": 0.545,
+                    "unit": "piece",
+                },
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert confirm_resp.status_code == 200
+
+    await db_session.refresh(ingredient)
+    assert ingredient.unit == "piece"
+    assert ingredient.current_price == pytest.approx(0.545, abs=0.01)
+
+    # Recipe: 1 piece × 0.545 €/piece = 0.545€ → 21.8%
+    await db_session.refresh(recipe)
+    assert recipe.food_cost == pytest.approx(0.545, abs=0.01)
+    assert recipe.food_cost_percent == pytest.approx(21.8, abs=0.5)
+
+
+async def test_confirm_fut_stores_price_per_liter(
+    client, auth_headers, db_session, restaurant, xml_file_path
+):
+    """Fût 50L: confirm with unit=l → price = total / (qty × volume) per liter."""
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Stella Artois",
+        unit="l",
+        current_price=None,
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    recipe = Recipe(
+        restaurant_id=restaurant.id,
+        name="Stella Artois 25cL",
+        selling_price=3.00,
+    )
+    db_session.add(recipe)
+    await db_session.flush()
+    await db_session.refresh(recipe)
+
+    ri = RecipeIngredient(
+        recipe_id=recipe.id,
+        ingredient_id=ingredient.id,
+        quantity=25,
+        unit="cl",
+    )
+    db_session.add(ri)
+    await db_session.flush()
+
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    # Frontend sends: unit=l, unit_price = 914.94 / (6 × 50) = 3.049 €/l
+    confirm_resp = await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={
+            "lines": [
+                {
+                    "description": "STELLA ARTOIS 50 L",
+                    "ingredient_id": ingredient.id,
+                    "unit_price": 3.049,
+                    "unit": "l",
+                },
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert confirm_resp.status_code == 200
+
+    await db_session.refresh(ingredient)
+    assert ingredient.unit == "l"
+    assert ingredient.current_price == pytest.approx(3.049, abs=0.01)
+
+    # Recipe: convert_quantity(25, "cl", "l") = 0.25 → 0.25 × 3.049 = 0.762€ → 25.4%
+    await db_session.refresh(recipe)
+    assert recipe.food_cost == pytest.approx(0.762, abs=0.01)
+    assert recipe.food_cost_percent == pytest.approx(25.4, abs=0.5)
+
+
 async def test_invoices_protected(client):
     """Without auth token → 401."""
     resp = await client.get("/api/invoices")

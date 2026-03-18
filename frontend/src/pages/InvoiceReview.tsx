@@ -94,7 +94,9 @@ export default function InvoiceReview() {
         suggested_portions: l.suggested_portions,
         price_per_portion: l.price_per_portion,
         ingredient_id: l.matched_ingredient_id,
-        create_ingredient_name: null,
+        create_ingredient_name: l.matched_ingredient_id
+          ? null
+          : (l.matched_ingredient_name ?? null),
         ignored: l.ignored ?? false,
         match_confidence: l.match_confidence,
         suggestions: l.suggestions,
@@ -330,13 +332,25 @@ export default function InvoiceReview() {
       let effectiveUnit = l.unit;
       let effectiveUnitPrice = unitPrice;
 
+      // Casier/pack : units_per_package ou packaging_units → prix par bouteille (piece)
+      const effectiveUPP = l.packaging_units ?? l.units_per_package;
       if (
+        effectiveUPP &&
+        effectiveUPP > 0 &&
+        totalPrice != null &&
+        quantity != null &&
+        quantity !== 0
+      ) {
+        effectiveUnit = 'piece';
+        effectiveUnitPrice = Math.abs(totalPrice) / (Math.abs(quantity) * effectiveUPP);
+      } else if (
         l.volume_liters &&
         l.volume_liters > 0 &&
         totalPrice != null &&
         quantity != null &&
         quantity !== 0
       ) {
+        // Fût/vrac : volume seul → prix par litre
         effectiveUnit = 'l';
         effectiveUnitPrice = Math.abs(totalPrice) / (Math.abs(quantity) * l.volume_liters);
       }

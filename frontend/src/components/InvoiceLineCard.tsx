@@ -359,7 +359,10 @@ export default function InvoiceLineCard({
               recipesList={recipesList}
               lineDescription={line.description}
               volumeInfo={
-                line.volume_liters && line.suggested_serving_cl
+                line.volume_liters &&
+                line.suggested_serving_cl &&
+                !line.units_per_package &&
+                !line.packaging_units
                   ? { servingCl: line.suggested_serving_cl }
                   : undefined
               }
