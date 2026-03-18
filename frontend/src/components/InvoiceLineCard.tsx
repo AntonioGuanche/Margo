@@ -366,6 +366,7 @@ export default function InvoiceLineCard({
                   ? { servingCl: line.suggested_serving_cl }
                   : undefined
               }
+              skipAutoSuggest={line.has_draft_recipe_links}
               onChange={(links) => onChange({ recipe_links: links })}
               onRenameRecipe={onRenameRecipe}
             />

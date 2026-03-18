@@ -17,6 +17,7 @@ export default function RecipeLinker({
   recipesList,
   lineDescription,
   volumeInfo,
+  skipAutoSuggest,
   onChange,
   onRenameRecipe,
 }: {
@@ -25,6 +26,7 @@ export default function RecipeLinker({
   recipesList: { id: number; name: string }[];
   lineDescription: string;
   volumeInfo?: VolumeInfo;
+  skipAutoSuggest?: boolean;
   onChange: (links: RecipeLinkState[]) => void;
   onRenameRecipe?: (recipeId: number, newName: string) => Promise<void>;
 }) {
@@ -54,7 +56,9 @@ export default function RecipeLinker({
   });
 
   // Auto-suggest when ingredient has existing recipes and links are empty
+  // SKIP if draft recipe links exist (user has already made deliberate choices)
   useEffect(() => {
+    if (skipAutoSuggest) return;
     if (existingRecipes?.items && existingRecipes.items.length > 0 && recipeLinks.length === 0 && !autoSuggested) {
       setAutoSuggested(true);
       onChange(
@@ -67,7 +71,7 @@ export default function RecipeLinker({
         })),
       );
     }
-  }, [existingRecipes, autoSuggested]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [existingRecipes, autoSuggested, skipAutoSuggest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function addRecipe(recipeId: number) {
     const recipe = recipesList.find((r) => r.id === recipeId);

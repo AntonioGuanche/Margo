@@ -71,16 +71,18 @@ export default function InvoiceReview() {
             ? allIngredients.find((ing) => ing.id === l.ingredient_id)?.name ?? null
             : l.create_ingredient_name ?? null,
         ignored: l.ignored,
-        draft_recipe_links: l.recipe_links.map((rl) => ({
-          recipe_id: rl.recipe_id,
-          recipe_name: rl.recipe_name,
-          quantity: rl.quantity,
-          unit: rl.unit,
-          create_recipe_name: rl.create_recipe_name ?? null,
-          create_recipe_price: rl.create_recipe_price ?? null,
-          create_recipe_category: rl.create_recipe_category ?? null,
-          create_recipe_is_homemade: rl.create_recipe_is_homemade ?? null,
-        })),
+        draft_recipe_links: l.has_draft_recipe_links
+          ? l.recipe_links.map((rl) => ({
+              recipe_id: rl.recipe_id,
+              recipe_name: rl.recipe_name,
+              quantity: rl.quantity,
+              unit: rl.unit,
+              create_recipe_name: rl.create_recipe_name ?? null,
+              create_recipe_price: rl.create_recipe_price ?? null,
+              create_recipe_category: rl.create_recipe_category ?? null,
+              create_recipe_is_homemade: rl.create_recipe_is_homemade ?? null,
+            }))
+          : null,
       }));
 
       patchInvoice.mutate({ lines: linePatch });
@@ -271,7 +273,21 @@ export default function InvoiceReview() {
 
   const updateLine = (index: number, updates: Partial<LineState>) => {
     setLines((prev) => {
-      const next = prev.map((l, i) => (i === index ? { ...l, ...updates } : l));
+      const next = prev.map((l, i) => {
+        if (i !== index) return l;
+        const updated = { ...l, ...updates };
+        // When recipe_links are modified by user (not ingredient change), mark as draft
+        if ('recipe_links' in updates) {
+          if ('ingredient_id' in updates) {
+            // Ingredient changed → reset draft flag so auto-suggest can work for new ingredient
+            updated.has_draft_recipe_links = false;
+          } else {
+            // Pure recipe link edit → mark as draft to prevent auto-suggest override
+            updated.has_draft_recipe_links = true;
+          }
+        }
+        return updated;
+      });
 
       // Save immediately if ingredient assignment, ignored, create, or recipe links changed
       if ('ingredient_id' in updates || 'ignored' in updates || 'create_ingredient_name' in updates || 'recipe_links' in updates) {
