@@ -613,6 +613,13 @@ async def patch_invoice(
         # Force SQLAlchemy to detect the JSONB mutation
         invoice.extracted_lines = updated_lines
 
+    if body.lines is not None:
+        logger.info(
+            "Invoice %d lines patched: %d lines updated",
+            invoice_id,
+            len(body.lines),
+        )
+
     await db.flush()
     await db.refresh(invoice)
 

@@ -96,18 +96,15 @@ export function useConfirmInvoice(invoiceId: number | string) {
 }
 
 export function usePatchInvoice(invoiceId: number | string) {
-  const queryClient = useQueryClient();
-
   return useMutation<InvoiceDetailResponse, Error, InvoicePatchRequest>({
     mutationFn: (body) =>
       apiClient<InvoiceDetailResponse>(`/api/invoices/${invoiceId}`, {
         method: 'PATCH',
         body,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', String(invoiceId)] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-    },
+    // Do NOT invalidate the current invoice query — we're saving draft state
+    // The user's React state IS the source of truth while editing
+    // The JSONB is just persistence for when they leave and come back
   });
 }
 

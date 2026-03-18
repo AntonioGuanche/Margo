@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -59,43 +59,24 @@ export default function InvoiceReview() {
     (i: { id: number; name: string }) => ({ id: i.id, name: i.name }),
   );
 
-  // Auto-save line edits to backend (debounced)
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Save line assignments to backend IMMEDIATELY (no debounce — fire and forget)
+  const saveLinesToBackend = useCallback(
+    (currentLines: LineState[]) => {
+      if (!id) return;
 
-  const saveLinesToBackend = useCallback((currentLines: LineState[]) => {
-    if (!id) return;
+      const linePatch = currentLines.map((l) => ({
+        matched_ingredient_id: l.ingredient_id,
+        matched_ingredient_name:
+          l.ingredient_id
+            ? allIngredients.find((ing) => ing.id === l.ingredient_id)?.name ?? null
+            : l.create_ingredient_name ?? null,
+        ignored: l.ignored,
+      }));
 
-    const linePatch = currentLines.map((l) => ({
-      matched_ingredient_id: l.ingredient_id,
-      matched_ingredient_name:
-        l.ingredient_id
-          ? allIngredients.find((ing) => ing.id === l.ingredient_id)?.name ??
-            l.create_ingredient_name ??
-            null
-          : l.create_ingredient_name ?? null,
-      ignored: l.ignored,
-    }));
-
-    patchInvoice.mutate({ lines: linePatch });
-  }, [id, allIngredients, patchInvoice]);
-
-  const debouncedSave = useCallback((currentLines: LineState[]) => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    saveTimeoutRef.current = setTimeout(() => {
-      saveLinesToBackend(currentLines);
-    }, 1500);
-  }, [saveLinesToBackend]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
+      patchInvoice.mutate({ lines: linePatch });
+    },
+    [id, allIngredients, patchInvoice],
+  );
 
   // Initialize line state from fetched data
   if (invoice && !initialized) {
@@ -133,9 +114,12 @@ export default function InvoiceReview() {
 
   const recipesList = (recipesData?.items ?? []).map((r) => ({ id: r.id, name: r.name }));
 
-  // Batch-fetch recipes for all matched ingredients after init
+  // Batch-fetch recipes for all matched ingredients after init (FIRST LOAD ONLY)
   useEffect(() => {
     if (!initialized || recipesPreFilled || lines.length === 0) return;
+
+    // Mark as done IMMEDIATELY to prevent re-runs on re-render
+    setRecipesPreFilled(true);
 
     const ingredientIds = [
       ...new Set(
@@ -145,10 +129,7 @@ export default function InvoiceReview() {
       ),
     ];
 
-    if (ingredientIds.length === 0) {
-      setRecipesPreFilled(true);
-      return;
-    }
+    if (ingredientIds.length === 0) return;
 
     apiClient<{ results: Record<number, IngredientRecipeItem[]> }>(
       '/api/ingredients/recipes-batch',
@@ -157,6 +138,7 @@ export default function InvoiceReview() {
       .then((data) => {
         setLines((prev) =>
           prev.map((line) => {
+            // ONLY pre-fill if line has NO recipe links yet
             if (!line.ingredient_id || line.recipe_links.length > 0) return line;
             const recipes = data.results[line.ingredient_id] || [];
             if (recipes.length > 0) {
@@ -210,10 +192,9 @@ export default function InvoiceReview() {
             return line;
           }),
         );
-        setRecipesPreFilled(true);
       })
       .catch(() => {
-        setRecipesPreFilled(true);
+        // Already marked as pre-filled
       });
   }, [initialized, recipesPreFilled, lines.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -237,9 +218,9 @@ export default function InvoiceReview() {
     setLines((prev) => {
       const next = prev.map((l, i) => (i === index ? { ...l, ...updates } : l));
 
-      // Auto-save if ingredient assignment or ignored status changed
+      // Save immediately if ingredient assignment or ignored status changed
       if ('ingredient_id' in updates || 'ignored' in updates || 'create_ingredient_name' in updates) {
-        debouncedSave(next);
+        saveLinesToBackend(next);
       }
 
       return next;
@@ -283,12 +264,6 @@ export default function InvoiceReview() {
     .filter((item) => item.line.ignored);
 
   const handleConfirm = () => {
-    // Cancel any pending auto-save
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = null;
-    }
-
     const confirmLines = lines.map((l) => {
       // Ignored lines: send with ignored=true, no ingredient
       if (l.ignored) {
@@ -455,6 +430,12 @@ export default function InvoiceReview() {
       <h2 className="text-xl font-semibold text-stone-900 mb-1 flex items-center gap-2">
         <FileCheck size={22} className="text-orange-700" />
         Vérifier la facture
+        {patchInvoice.isPending && (
+          <span className="text-xs text-stone-400 flex items-center gap-1">
+            <Loader2 size={10} className="animate-spin" />
+            Sauvegarde...
+          </span>
+        )}
       </h2>
 
       {/* Invoice metadata — editable supplier & date */}
