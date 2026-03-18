@@ -25,6 +25,16 @@ export interface InvoiceLineResponse {
   match_confidence: string;
   suggestions: IngredientSuggestion[];
   ignored: boolean;
+  draft_recipe_links?: Array<{
+    recipe_id: number | null;
+    recipe_name: string;
+    quantity: number;
+    unit: string;
+    create_recipe_name?: string | null;
+    create_recipe_price?: number | null;
+    create_recipe_category?: string | null;
+    create_recipe_is_homemade?: boolean | null;
+  }> | null;
 }
 
 export interface InvoiceUploadResponse {
@@ -85,6 +95,16 @@ export interface InvoiceLinePatchItem {
   matched_ingredient_id: number | null;
   matched_ingredient_name: string | null;
   ignored: boolean;
+  draft_recipe_links?: Array<{
+    recipe_id: number | null;
+    recipe_name: string;
+    quantity: number;
+    unit: string;
+    create_recipe_name?: string | null;
+    create_recipe_price?: number | null;
+    create_recipe_category?: string | null;
+    create_recipe_is_homemade?: boolean | null;
+  }> | null;
 }
 
 export interface InvoicePatchRequest {
@@ -145,6 +165,7 @@ export interface LineState {
   suggestions: IngredientSuggestion[];
   is_manual: boolean;
   recipe_links: RecipeLinkState[];
+  has_draft_recipe_links: boolean;
   // User-editable packaging override
   packaging_units: number | null;
   packaging_cl_per_unit: number | null;

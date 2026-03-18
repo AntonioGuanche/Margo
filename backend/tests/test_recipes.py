@@ -487,3 +487,68 @@ async def test_food_cost_non_homemade_with_unit_conversion(
     # food_cost_percent = 0.7625 / 3.00 * 100 ≈ 25.42
     assert data["food_cost_percent"] is not None
     assert abs(data["food_cost_percent"] - 25.42) < 0.5
+
+
+async def test_remove_recipe_ingredient(
+    client: AsyncClient, auth_headers: dict, db_session, restaurant
+):
+    """DELETE /recipes/{id}/ingredients/{id} removes link and recalculates food cost."""
+    from app.models.recipe import Recipe, RecipeIngredient
+
+    ingredient1 = Ingredient(
+        restaurant_id=restaurant.id, name="Saucisse sèche", unit="piece", current_price=1.50
+    )
+    ingredient2 = Ingredient(
+        restaurant_id=restaurant.id, name="Saucisson d'Ardenne", unit="kg", current_price=16.0
+    )
+    db_session.add_all([ingredient1, ingredient2])
+    await db_session.flush()
+    await db_session.refresh(ingredient1)
+    await db_session.refresh(ingredient2)
+
+    recipe = Recipe(
+        restaurant_id=restaurant.id, name="Saucisse sèche", selling_price=3.0
+    )
+    db_session.add(recipe)
+    await db_session.flush()
+    await db_session.refresh(recipe)
+
+    ri1 = RecipeIngredient(recipe_id=recipe.id, ingredient_id=ingredient1.id, quantity=1, unit="piece")
+    ri2 = RecipeIngredient(recipe_id=recipe.id, ingredient_id=ingredient2.id, quantity=1, unit="piece")
+    db_session.add_all([ri1, ri2])
+    await db_session.flush()
+
+    # Remove the erroneous Saucisson d'Ardenne link
+    resp = await client.delete(
+        f"/api/recipes/{recipe.id}/ingredients/{ingredient2.id}",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 204
+
+    # After: 1 ingredient, food cost = 1.50
+    await db_session.refresh(recipe)
+    assert recipe.food_cost == pytest.approx(1.50, abs=0.01)
+    assert recipe.food_cost_percent == pytest.approx(50.0, abs=0.1)
+
+    # Verify GET shows only 1 ingredient
+    get_resp = await client.get(f"/api/recipes/{recipe.id}", headers=auth_headers)
+    assert len(get_resp.json()["ingredients"]) == 1
+    assert get_resp.json()["ingredients"][0]["ingredient_name"] == "Saucisse sèche"
+
+
+async def test_remove_recipe_ingredient_not_found(
+    client: AsyncClient, auth_headers: dict, db_session, restaurant
+):
+    """DELETE returns 404 for non-existent link."""
+    from app.models.recipe import Recipe
+
+    recipe = Recipe(restaurant_id=restaurant.id, name="Test", selling_price=5.0)
+    db_session.add(recipe)
+    await db_session.flush()
+    await db_session.refresh(recipe)
+
+    resp = await client.delete(
+        f"/api/recipes/{recipe.id}/ingredients/99999",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404

@@ -149,6 +149,46 @@ async def recalculate_all_recipes(
     return {"recalculated": count}
 
 
+@router.delete("/{recipe_id}/ingredients/{ingredient_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_recipe_ingredient(
+    recipe_id: int,
+    ingredient_id: int,
+    db: AsyncSession = Depends(get_db),
+    restaurant: Restaurant = Depends(get_current_restaurant),
+) -> None:
+    """Remove a single ingredient from a recipe and recalculate food cost."""
+    recipe_result = await db.execute(
+        select(Recipe).where(
+            Recipe.id == recipe_id,
+            Recipe.restaurant_id == restaurant.id,
+        )
+    )
+    recipe = recipe_result.scalar_one_or_none()
+    if not recipe:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recette introuvable.",
+        )
+
+    ri_result = await db.execute(
+        select(RecipeIngredient).where(
+            RecipeIngredient.recipe_id == recipe_id,
+            RecipeIngredient.ingredient_id == ingredient_id,
+        )
+    )
+    ri = ri_result.scalar_one_or_none()
+    if not ri:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lien ingrédient introuvable.",
+        )
+
+    await db.delete(ri)
+    await db.flush()
+
+    await recalculate_recipe(db, recipe_id)
+
+
 @router.get("/{recipe_id}", response_model=RecipeResponse)
 async def get_recipe(
     recipe_id: int,

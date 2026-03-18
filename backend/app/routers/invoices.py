@@ -163,6 +163,7 @@ def _line_dict_to_response(ld: dict) -> InvoiceLineResponse:
             IngredientSuggestion(**s) for s in ld.get("suggestions", [])
         ],
         ignored=ld.get("ignored", False),
+        draft_recipe_links=ld.get("draft_recipe_links"),
     )
 
 
@@ -623,6 +624,8 @@ async def patch_invoice(
                 updated_lines[i]["matched_ingredient_id"] = line_patch.matched_ingredient_id
                 updated_lines[i]["matched_ingredient_name"] = line_patch.matched_ingredient_name
                 updated_lines[i]["ignored"] = line_patch.ignored
+                if line_patch.draft_recipe_links is not None:
+                    updated_lines[i]["draft_recipe_links"] = line_patch.draft_recipe_links
 
         # Force SQLAlchemy to detect the JSONB mutation
         invoice.extracted_lines = updated_lines

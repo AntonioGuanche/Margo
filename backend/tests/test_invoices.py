@@ -1310,6 +1310,100 @@ async def test_confirm_fut_stores_price_per_liter(
     assert recipe.food_cost_percent == pytest.approx(25.4, abs=0.5)
 
 
+async def test_patch_saves_draft_recipe_links(
+    client, auth_headers, db_session, restaurant, xml_file_path
+):
+    """PATCH saves draft_recipe_links in JSONB and returns them."""
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id, name="Saucisson", unit="kg", current_price=16.0
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    # PATCH with draft_recipe_links
+    patch_resp = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={
+            "lines": [
+                {
+                    "matched_ingredient_id": ingredient.id,
+                    "matched_ingredient_name": "Saucisson",
+                    "ignored": False,
+                    "draft_recipe_links": [
+                        {"recipe_id": 999, "recipe_name": "Portion Saucisson", "quantity": 120, "unit": "g"}
+                    ],
+                },
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert patch_resp.status_code == 200
+
+    # Verify draft_recipe_links returned and persisted
+    data = patch_resp.json()
+    line = data["lines"][0]
+    assert line.get("draft_recipe_links") is not None
+    assert len(line["draft_recipe_links"]) == 1
+    assert line["draft_recipe_links"][0]["recipe_name"] == "Portion Saucisson"
+
+    # GET should also return them
+    get_resp = await client.get(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert get_resp.status_code == 200
+    get_line = get_resp.json()["lines"][0]
+    assert get_line.get("draft_recipe_links") is not None
+    assert len(get_line["draft_recipe_links"]) == 1
+
+
+async def test_patch_empty_draft_links_persists(
+    client, auth_headers, db_session, restaurant, xml_file_path
+):
+    """PATCH with empty draft_recipe_links = user removed all links. Must persist as empty list."""
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id, name="Beurre test", unit="kg", current_price=10.0
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    # PATCH with EMPTY draft_recipe_links (user removed all links)
+    patch_resp = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={
+            "lines": [
+                {
+                    "matched_ingredient_id": ingredient.id,
+                    "matched_ingredient_name": "Beurre test",
+                    "ignored": False,
+                    "draft_recipe_links": [],
+                },
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert patch_resp.status_code == 200
+
+    # Empty list should be persisted (not null)
+    data = patch_resp.json()
+    assert data["lines"][0].get("draft_recipe_links") == []
+
+
 async def test_invoices_protected(client):
     """Without auth token → 401."""
     resp = await client.get("/api/invoices")

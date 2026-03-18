@@ -85,6 +85,22 @@ export function useDeleteAllRecipes() {
   });
 }
 
+export function useRemoveRecipeIngredient() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, { recipeId: number; ingredientId: number }>({
+    mutationFn: ({ recipeId, ingredientId }) =>
+      apiClient<void>(`/api/recipes/${recipeId}/ingredients/${ingredientId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['recipe'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
 export function useDashboard() {
   return useQuery({
     queryKey: ['dashboard'],

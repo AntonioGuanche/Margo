@@ -33,6 +33,7 @@ class InvoiceLineResponse(BaseModel):
     match_confidence: str = "none"
     suggestions: list[IngredientSuggestion] = []
     ignored: bool = False
+    draft_recipe_links: list[dict] | None = None  # User draft of recipe links (pre-confirm)
 
 
 class InvoiceUploadResponse(BaseModel):
@@ -112,6 +113,7 @@ class InvoiceLinePatchItem(BaseModel):
     matched_ingredient_id: int | None = None
     matched_ingredient_name: str | None = None
     ignored: bool = False
+    draft_recipe_links: list[dict] | None = None  # User draft of recipe links (pre-confirm)
 
 
 class InvoicePatchRequest(BaseModel):

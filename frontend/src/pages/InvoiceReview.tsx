@@ -71,6 +71,16 @@ export default function InvoiceReview() {
             ? allIngredients.find((ing) => ing.id === l.ingredient_id)?.name ?? null
             : l.create_ingredient_name ?? null,
         ignored: l.ignored,
+        draft_recipe_links: l.recipe_links.map((rl) => ({
+          recipe_id: rl.recipe_id,
+          recipe_name: rl.recipe_name,
+          quantity: rl.quantity,
+          unit: rl.unit,
+          create_recipe_name: rl.create_recipe_name ?? null,
+          create_recipe_price: rl.create_recipe_price ?? null,
+          create_recipe_category: rl.create_recipe_category ?? null,
+          create_recipe_is_homemade: rl.create_recipe_is_homemade ?? null,
+        })),
       }));
 
       patchInvoice.mutate({ lines: linePatch });
@@ -101,7 +111,20 @@ export default function InvoiceReview() {
         match_confidence: l.match_confidence,
         suggestions: l.suggestions,
         is_manual: false,
-        recipe_links: [],
+        recipe_links: (l as any).draft_recipe_links
+          ? ((l as any).draft_recipe_links as any[]).map((rl: any) => ({
+              recipe_id: rl.recipe_id ?? null,
+              recipe_name: rl.recipe_name ?? '',
+              quantity: rl.quantity ?? 1,
+              unit: rl.unit ?? 'piece',
+              is_new: !!rl.create_recipe_name,
+              create_recipe_name: rl.create_recipe_name ?? undefined,
+              create_recipe_price: rl.create_recipe_price ?? undefined,
+              create_recipe_category: rl.create_recipe_category ?? undefined,
+              create_recipe_is_homemade: rl.create_recipe_is_homemade ?? undefined,
+            }))
+          : [],
+        has_draft_recipe_links: (l as any).draft_recipe_links != null,
         packaging_units: null,
         packaging_cl_per_unit: null,
       })),
@@ -126,7 +149,7 @@ export default function InvoiceReview() {
     const ingredientIds = [
       ...new Set(
         lines
-          .filter((l) => l.ingredient_id && l.recipe_links.length === 0)
+          .filter((l) => l.ingredient_id && l.recipe_links.length === 0 && !l.has_draft_recipe_links)
           .map((l) => l.ingredient_id!),
       ),
     ];
@@ -250,8 +273,8 @@ export default function InvoiceReview() {
     setLines((prev) => {
       const next = prev.map((l, i) => (i === index ? { ...l, ...updates } : l));
 
-      // Save immediately if ingredient assignment or ignored status changed
-      if ('ingredient_id' in updates || 'ignored' in updates || 'create_ingredient_name' in updates) {
+      // Save immediately if ingredient assignment, ignored, create, or recipe links changed
+      if ('ingredient_id' in updates || 'ignored' in updates || 'create_ingredient_name' in updates || 'recipe_links' in updates) {
         saveLinesToBackend(next);
       }
 
@@ -281,6 +304,7 @@ export default function InvoiceReview() {
         suggestions: [],
         is_manual: true,
         recipe_links: [],
+        has_draft_recipe_links: false,
         packaging_units: null,
         packaging_cl_per_unit: null,
       },

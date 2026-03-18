@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Pencil, Trash2, SlidersHorizontal } from 'lucide-react';
-import { useRecipe, useDeleteRecipe } from '../hooks/useRecipes';
+import { ArrowLeft, Pencil, Trash2, SlidersHorizontal, X } from 'lucide-react';
+import { useRecipe, useDeleteRecipe, useRemoveRecipeIngredient } from '../hooks/useRecipes';
 import ConfirmModal from '../components/ConfirmModal';
 import { SkeletonList } from '../components/Skeleton';
 import { STATUS_COLORS } from '../utils/colors';
@@ -12,7 +12,14 @@ export default function RecipeDetail() {
   const navigate = useNavigate();
   const { data: recipe, isLoading } = useRecipe(id ? parseInt(id) : null);
   const deleteMutation = useDeleteRecipe();
+  const removeIngredient = useRemoveRecipeIngredient();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [ingredientToRemove, setIngredientToRemove] = useState<{
+    id: number;
+    ingredient_id: number;
+    ingredient_name: string;
+  } | null>(null);
 
   if (isLoading) {
     return <SkeletonList count={4} />;
@@ -124,22 +131,34 @@ export default function RecipeDetail() {
                 {ri.quantity} {ri.unit}
               </span>
             </div>
-            <div className="text-right">
-              {ri.unit_cost != null ? (
-                <>
-                  <p className="text-xs text-stone-400">
-                    {ri.unit_cost.toFixed(2)} €/{ri.unit_cost_unit ?? ri.unit}
-                  </p>
-                  <p className="text-sm font-medium text-stone-700">
-                    {ri.line_cost != null ? `${ri.line_cost.toFixed(2)} €` : '—'}
-                  </p>
-                </>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-                  Prix manquant
-                </span>
-              )}
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                {ri.unit_cost != null ? (
+                  <>
+                    <p className="text-xs text-stone-400">
+                      {ri.unit_cost.toFixed(2)} €/{ri.unit_cost_unit ?? ri.unit}
+                    </p>
+                    <p className="text-sm font-medium text-stone-700">
+                      {ri.line_cost != null ? `${ri.line_cost.toFixed(2)} €` : '—'}
+                    </p>
+                  </>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                    <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+                    Prix manquant
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setIngredientToRemove(ri);
+                  setShowRemoveConfirm(true);
+                }}
+                className="p-1 text-stone-300 hover:text-red-500 transition-colors"
+                title="Retirer de la recette"
+              >
+                <X size={14} />
+              </button>
             </div>
           </div>
         ))}
@@ -152,6 +171,32 @@ export default function RecipeDetail() {
           </span>
         </div>
       </div>
+
+      {/* Remove ingredient confirmation */}
+      {showRemoveConfirm && ingredientToRemove && recipe && (
+        <ConfirmModal
+          title={`Retirer « ${ingredientToRemove.ingredient_name} » ?`}
+          message={`L'ingrédient sera retiré de la recette « ${recipe.name} ». Le food cost sera recalculé.`}
+          onConfirm={() => {
+            removeIngredient.mutate(
+              { recipeId: recipe.id, ingredientId: ingredientToRemove.ingredient_id },
+              {
+                onSuccess: () => {
+                  toast.success('Ingrédient retiré');
+                  setShowRemoveConfirm(false);
+                  setIngredientToRemove(null);
+                },
+                onError: (err) => toast.error(err.message),
+              },
+            );
+          }}
+          onCancel={() => {
+            setShowRemoveConfirm(false);
+            setIngredientToRemove(null);
+          }}
+          isLoading={removeIngredient.isPending}
+        />
+      )}
 
       {/* Delete confirmation */}
       {showDeleteConfirm && recipe && (
