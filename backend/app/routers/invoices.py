@@ -520,6 +520,32 @@ async def confirm_invoice(
             db, restaurant.id, ing_id, old_price, new_price, invoice.id
         )
 
+    # Write final line assignments back into JSONB
+    if invoice.extracted_lines and body.lines:
+        updated_lines = list(invoice.extracted_lines)
+        for i, line in enumerate(body.lines):
+            if i < len(updated_lines):
+                updated_lines[i]["ignored"] = line.ignored
+
+                if line.ingredient_id is not None:
+                    updated_lines[i]["matched_ingredient_id"] = line.ingredient_id
+                    ing_result = await db.execute(
+                        select(Ingredient.name).where(Ingredient.id == line.ingredient_id)
+                    )
+                    ing_name = ing_result.scalar_one_or_none()
+                    if ing_name:
+                        updated_lines[i]["matched_ingredient_name"] = ing_name
+                    updated_lines[i]["match_confidence"] = "confirmed"
+                elif line.create_ingredient_name:
+                    updated_lines[i]["matched_ingredient_name"] = line.create_ingredient_name.strip()
+                    updated_lines[i]["match_confidence"] = "confirmed"
+                else:
+                    updated_lines[i]["matched_ingredient_id"] = None
+                    updated_lines[i]["matched_ingredient_name"] = None
+
+        # Force SQLAlchemy to detect JSONB mutation
+        invoice.extracted_lines = updated_lines
+
     # Update invoice status
     invoice.status = "confirmed"
     await db.flush()

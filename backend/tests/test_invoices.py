@@ -951,6 +951,178 @@ async def test_patch_invoice_preserves_other_fields(client, auth_headers, xml_fi
     assert patched_first["matched_ingredient_name"] == "Test"
 
 
+async def test_confirm_saves_assignments_to_jsonb(client, auth_headers, db_session, restaurant, xml_file_path):
+    """After confirm, the JSONB should reflect final assignments, not OCR matches."""
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Saucisse sèche",
+        unit="kg",
+        current_price=15.0,
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+    num_lines = len(upload_resp.json()["lines"])
+
+    # Confirm: assign ingredient to first line, send all lines
+    confirm_lines = [
+        {
+            "description": upload_resp.json()["lines"][0]["description"],
+            "ingredient_id": ingredient.id,
+            "unit_price": 15.0,
+            "unit": "kg",
+            "ignored": False,
+        }
+    ] + [
+        {
+            "description": upload_resp.json()["lines"][i]["description"],
+            "ingredient_id": None,
+            "create_ingredient_name": None,
+            "unit_price": None,
+            "unit": None,
+            "ignored": False,
+        }
+        for i in range(1, num_lines)
+    ]
+
+    resp = await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={"lines": confirm_lines},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+
+    # GET the invoice — JSONB should reflect the confirmed assignment
+    get_resp = await client.get(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert get_resp.status_code == 200
+    first_line = get_resp.json()["lines"][0]
+    assert first_line["matched_ingredient_id"] == ingredient.id
+    assert first_line["matched_ingredient_name"] == "Saucisse sèche"
+    assert first_line["match_confidence"] == "confirmed"
+
+
+async def test_confirm_saves_ignored_lines_to_jsonb(client, auth_headers, xml_file_path):
+    """After confirm, ignored lines should be marked in JSONB."""
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+    num_lines = len(upload_resp.json()["lines"])
+    assert num_lines >= 2
+
+    # Confirm: first line active (no ingredient), second line ignored
+    confirm_lines = [
+        {
+            "description": upload_resp.json()["lines"][0]["description"],
+            "ingredient_id": None,
+            "create_ingredient_name": None,
+            "unit_price": None,
+            "unit": None,
+            "ignored": False,
+        },
+        {
+            "description": upload_resp.json()["lines"][1]["description"],
+            "ingredient_id": None,
+            "create_ingredient_name": None,
+            "unit_price": None,
+            "unit": None,
+            "ignored": True,
+        },
+    ] + [
+        {
+            "description": upload_resp.json()["lines"][i]["description"],
+            "ingredient_id": None,
+            "create_ingredient_name": None,
+            "unit_price": None,
+            "unit": None,
+            "ignored": False,
+        }
+        for i in range(2, num_lines)
+    ]
+
+    resp = await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={"lines": confirm_lines},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+
+    # GET the invoice — second line should be ignored
+    get_resp = await client.get(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert get_resp.json()["lines"][0]["ignored"] is False
+    assert get_resp.json()["lines"][1]["ignored"] is True
+
+
+async def test_reopen_confirmed_invoice_shows_saved_data(client, auth_headers, db_session, restaurant, xml_file_path):
+    """Opening a confirmed invoice should show the confirmed assignments."""
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Fromage belge",
+        unit="kg",
+        current_price=22.0,
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+    original_match_id = upload_resp.json()["lines"][0].get("matched_ingredient_id")
+    num_lines = len(upload_resp.json()["lines"])
+
+    # Confirm with custom assignment (different from OCR match)
+    confirm_lines = [
+        {
+            "description": upload_resp.json()["lines"][0]["description"],
+            "ingredient_id": ingredient.id,
+            "unit_price": 22.0,
+            "unit": "kg",
+            "ignored": False,
+        }
+    ] + [
+        {
+            "description": upload_resp.json()["lines"][i]["description"],
+            "ingredient_id": None,
+            "create_ingredient_name": None,
+            "unit_price": None,
+            "unit": None,
+            "ignored": False,
+        }
+        for i in range(1, num_lines)
+    ]
+
+    await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={"lines": confirm_lines},
+        headers=auth_headers,
+    )
+
+    # GET — should show confirmed assignment, not original OCR match
+    get_resp = await client.get(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    first_line = get_resp.json()["lines"][0]
+    assert first_line["matched_ingredient_id"] == ingredient.id
+    assert first_line["matched_ingredient_name"] == "Fromage belge"
+    # Should NOT be the original OCR match (if it was different)
+    if original_match_id is not None and original_match_id != ingredient.id:
+        assert first_line["matched_ingredient_id"] != original_match_id
+
+
 async def test_invoices_protected(client):
     """Without auth token → 401."""
     resp = await client.get("/api/invoices")
