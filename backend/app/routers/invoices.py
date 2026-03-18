@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.database import get_db
 from app.middleware.plan_limits import require_invoice_quota
@@ -545,6 +546,7 @@ async def confirm_invoice(
 
         # Force SQLAlchemy to detect JSONB mutation
         invoice.extracted_lines = updated_lines
+        flag_modified(invoice, "extracted_lines")
 
     # Update invoice status
     invoice.status = "confirmed"
@@ -612,6 +614,7 @@ async def patch_invoice(
 
         # Force SQLAlchemy to detect the JSONB mutation
         invoice.extracted_lines = updated_lines
+        flag_modified(invoice, "extracted_lines")
 
     if body.lines is not None:
         logger.info(
