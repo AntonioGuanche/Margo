@@ -32,6 +32,7 @@ class InvoiceLineResponse(BaseModel):
     matched_ingredient_name: str | None = None
     match_confidence: str = "none"
     suggestions: list[IngredientSuggestion] = []
+    ignored: bool = False
 
 
 class InvoiceUploadResponse(BaseModel):
@@ -106,9 +107,17 @@ class InvoiceListResponse(BaseModel):
 
 # --- Patch ---
 
+class InvoiceLinePatchItem(BaseModel):
+    """User edit for a single invoice line, identified by index."""
+    matched_ingredient_id: int | None = None
+    matched_ingredient_name: str | None = None
+    ignored: bool = False
+
+
 class InvoicePatchRequest(BaseModel):
     supplier_name: str | None = None
     invoice_date: str | None = None  # YYYY-MM-DD
+    lines: list[InvoiceLinePatchItem] | None = None  # user line edits, indexed by position
 
 
 # --- Detail ---

@@ -132,6 +132,7 @@ def _build_line_responses(match_results: list) -> list[dict]:
             "units_per_package": upp,
             "match_confidence": mr.confidence,
             "suggestions": mr.suggestions,
+            "ignored": False,
         })
     return lines
 
@@ -160,6 +161,7 @@ def _line_dict_to_response(ld: dict) -> InvoiceLineResponse:
         suggestions=[
             IngredientSuggestion(**s) for s in ld.get("suggestions", [])
         ],
+        ignored=ld.get("ignored", False),
     )
 
 
@@ -547,7 +549,12 @@ async def patch_invoice(
     db: AsyncSession = Depends(get_db),
     restaurant: Restaurant = Depends(get_current_restaurant),
 ) -> InvoiceDetailResponse:
-    """Update supplier name and/or date on a pending invoice."""
+    """Update invoice metadata and/or line-level user edits.
+
+    Lines are matched by index position. For each line in body.lines,
+    the corresponding extracted_lines[i] is updated with the user's
+    ingredient assignment and ignored status.
+    """
     result = await db.execute(
         select(Invoice).where(
             Invoice.id == invoice_id,
@@ -561,10 +568,24 @@ async def patch_invoice(
             detail="Facture introuvable.",
         )
 
+    # Update metadata fields
     if body.supplier_name is not None:
         invoice.supplier_name = body.supplier_name
     if body.invoice_date is not None:
         invoice.invoice_date = dt.date.fromisoformat(body.invoice_date)
+
+    # Update line-level edits in JSONB
+    if body.lines is not None and invoice.extracted_lines:
+        updated_lines = list(invoice.extracted_lines)
+
+        for i, line_patch in enumerate(body.lines):
+            if i < len(updated_lines):
+                updated_lines[i]["matched_ingredient_id"] = line_patch.matched_ingredient_id
+                updated_lines[i]["matched_ingredient_name"] = line_patch.matched_ingredient_name
+                updated_lines[i]["ignored"] = line_patch.ignored
+
+        # Force SQLAlchemy to detect the JSONB mutation
+        invoice.extracted_lines = updated_lines
 
     await db.flush()
     await db.refresh(invoice)

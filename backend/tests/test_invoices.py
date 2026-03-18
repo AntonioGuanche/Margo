@@ -825,6 +825,132 @@ async def test_confirm_duplicate_ingredient_name(
     assert ingredient.current_price == 6.50
 
 
+async def test_patch_invoice_saves_line_edits(client, auth_headers, db_session, restaurant, xml_file_path):
+    """PATCH with lines should persist ingredient assignments in JSONB."""
+    # Create an ingredient to assign
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Beurre",
+        unit="kg",
+        current_price=12.0,
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    # Upload invoice
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+    num_lines = len(upload_resp.json()["lines"])
+
+    # Build line patches — assign ingredient to first line
+    line_patches = [
+        {"matched_ingredient_id": ingredient.id, "matched_ingredient_name": "Beurre", "ignored": False}
+    ] + [
+        {"matched_ingredient_id": None, "matched_ingredient_name": None, "ignored": False}
+        for _ in range(num_lines - 1)
+    ]
+
+    # PATCH with lines
+    resp = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"lines": line_patches},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["lines"][0]["matched_ingredient_id"] == ingredient.id
+    assert resp.json()["lines"][0]["matched_ingredient_name"] == "Beurre"
+
+    # GET the invoice back — assignments should persist
+    get_resp = await client.get(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["lines"][0]["matched_ingredient_id"] == ingredient.id
+    assert get_resp.json()["lines"][0]["matched_ingredient_name"] == "Beurre"
+
+
+async def test_patch_invoice_saves_ignored_lines(client, auth_headers, xml_file_path):
+    """PATCH with ignored=True should persist in JSONB."""
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+    num_lines = len(upload_resp.json()["lines"])
+    assert num_lines > 0
+
+    # Ignore the first line
+    line_patches = [
+        {"matched_ingredient_id": None, "matched_ingredient_name": None, "ignored": True}
+    ] + [
+        {"matched_ingredient_id": None, "matched_ingredient_name": None, "ignored": False}
+        for _ in range(num_lines - 1)
+    ]
+
+    resp = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"lines": line_patches},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["lines"][0]["ignored"] is True
+
+    # GET back — ignored should persist
+    get_resp = await client.get(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert get_resp.json()["lines"][0]["ignored"] is True
+    # Other lines should not be ignored
+    if num_lines > 1:
+        assert get_resp.json()["lines"][1]["ignored"] is False
+
+
+async def test_patch_invoice_preserves_other_fields(client, auth_headers, xml_file_path):
+    """PATCH lines should not lose OCR data (description, quantity, price, etc.)."""
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+    original_lines = upload_resp.json()["lines"]
+    num_lines = len(original_lines)
+    assert num_lines > 0
+
+    # Note original first line data
+    original_first = original_lines[0]
+
+    # PATCH with line edits
+    line_patches = [
+        {"matched_ingredient_id": 999, "matched_ingredient_name": "Test", "ignored": False}
+    ] + [
+        {"matched_ingredient_id": None, "matched_ingredient_name": None, "ignored": False}
+        for _ in range(num_lines - 1)
+    ]
+
+    resp = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"lines": line_patches},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    patched_first = resp.json()["lines"][0]
+
+    # OCR data preserved
+    assert patched_first["description"] == original_first["description"]
+    assert patched_first["quantity"] == original_first["quantity"]
+    assert patched_first["unit_price"] == original_first["unit_price"]
+    assert patched_first["total_price"] == original_first["total_price"]
+    # User edit applied
+    assert patched_first["matched_ingredient_id"] == 999
+    assert patched_first["matched_ingredient_name"] == "Test"
+
+
 async def test_invoices_protected(client):
     """Without auth token → 401."""
     resp = await client.get("/api/invoices")

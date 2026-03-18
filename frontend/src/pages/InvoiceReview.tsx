@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -55,6 +55,48 @@ export default function InvoiceReview() {
   const [showIgnored, setShowIgnored] = useState(true);
   const [useAbsolutePrices, setUseAbsolutePrices] = useState(false);
 
+  const allIngredients: IngredientItem[] = (ingredientsData?.items ?? []).map(
+    (i: { id: number; name: string }) => ({ id: i.id, name: i.name }),
+  );
+
+  // Auto-save line edits to backend (debounced)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const saveLinesToBackend = useCallback((currentLines: LineState[]) => {
+    if (!id) return;
+
+    const linePatch = currentLines.map((l) => ({
+      matched_ingredient_id: l.ingredient_id,
+      matched_ingredient_name:
+        l.ingredient_id
+          ? allIngredients.find((ing) => ing.id === l.ingredient_id)?.name ??
+            l.create_ingredient_name ??
+            null
+          : l.create_ingredient_name ?? null,
+      ignored: l.ignored,
+    }));
+
+    patchInvoice.mutate({ lines: linePatch });
+  }, [id, allIngredients, patchInvoice]);
+
+  const debouncedSave = useCallback((currentLines: LineState[]) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveLinesToBackend(currentLines);
+    }, 1500);
+  }, [saveLinesToBackend]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Initialize line state from fetched data
   if (invoice && !initialized) {
     setLines(
@@ -72,7 +114,7 @@ export default function InvoiceReview() {
         price_per_portion: l.price_per_portion,
         ingredient_id: l.matched_ingredient_id,
         create_ingredient_name: null,
-        ignored: false,
+        ignored: l.ignored ?? false,
         match_confidence: l.match_confidence,
         suggestions: l.suggestions,
         is_manual: false,
@@ -88,10 +130,6 @@ export default function InvoiceReview() {
     }
     setInitialized(true);
   }
-
-  const allIngredients: IngredientItem[] = (ingredientsData?.items ?? []).map(
-    (i: { id: number; name: string }) => ({ id: i.id, name: i.name }),
-  );
 
   const recipesList = (recipesData?.items ?? []).map((r) => ({ id: r.id, name: r.name }));
 
@@ -196,7 +234,16 @@ export default function InvoiceReview() {
   };
 
   const updateLine = (index: number, updates: Partial<LineState>) => {
-    setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...updates } : l)));
+    setLines((prev) => {
+      const next = prev.map((l, i) => (i === index ? { ...l, ...updates } : l));
+
+      // Auto-save if ingredient assignment or ignored status changed
+      if ('ingredient_id' in updates || 'ignored' in updates || 'create_ingredient_name' in updates) {
+        debouncedSave(next);
+      }
+
+      return next;
+    });
   };
 
   const addManualLine = useCallback(() => {

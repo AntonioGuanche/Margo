@@ -6,6 +6,7 @@ import type {
   InvoiceUploadResponse,
   InvoiceConfirmResponse,
   InvoiceConfirmLine,
+  InvoicePatchRequest,
 } from '../types';
 
 // Re-export for consumers who import from hook
@@ -97,7 +98,7 @@ export function useConfirmInvoice(invoiceId: number | string) {
 export function usePatchInvoice(invoiceId: number | string) {
   const queryClient = useQueryClient();
 
-  return useMutation<InvoiceDetailResponse, Error, { supplier_name?: string; invoice_date?: string }>({
+  return useMutation<InvoiceDetailResponse, Error, InvoicePatchRequest>({
     mutationFn: (body) =>
       apiClient<InvoiceDetailResponse>(`/api/invoices/${invoiceId}`, {
         method: 'PATCH',

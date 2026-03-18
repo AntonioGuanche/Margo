@@ -24,6 +24,7 @@ export interface InvoiceLineResponse {
   matched_ingredient_name: string | null;
   match_confidence: string;
   suggestions: IngredientSuggestion[];
+  ignored: boolean;
 }
 
 export interface InvoiceUploadResponse {
@@ -78,6 +79,18 @@ export interface InvoiceConfirmResponse {
   aliases_saved: number;
   recipes_recalculated: number;
   recipes_created: number;
+}
+
+export interface InvoiceLinePatchItem {
+  matched_ingredient_id: number | null;
+  matched_ingredient_name: string | null;
+  ignored: boolean;
+}
+
+export interface InvoicePatchRequest {
+  supplier_name?: string;
+  invoice_date?: string;
+  lines?: InvoiceLinePatchItem[];
 }
 
 export interface RecipeLinkRequest {
