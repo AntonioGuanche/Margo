@@ -1123,6 +1123,59 @@ async def test_reopen_confirmed_invoice_shows_saved_data(client, auth_headers, d
         assert first_line["matched_ingredient_id"] != original_match_id
 
 
+async def test_confirm_saves_recipe_links_in_jsonb(
+    client, auth_headers, db_session, restaurant, xml_file_path
+):
+    """Confirm should save confirmed_recipe_links in extracted_lines JSONB."""
+    from sqlalchemy import select
+    from app.models.invoice import Invoice
+
+    ing = Ingredient(restaurant_id=restaurant.id, name="TestIng", unit="kg", current_price=10.0)
+    db_session.add(ing)
+    await db_session.flush()
+    await db_session.refresh(ing)
+
+    recipe = Recipe(restaurant_id=restaurant.id, name="TestRecipe", selling_price=15.0)
+    db_session.add(recipe)
+    await db_session.flush()
+    await db_session.refresh(recipe)
+
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    confirm_resp = await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={
+            "lines": [{
+                "description": "Test product",
+                "ingredient_id": ing.id,
+                "unit_price": 12.0,
+                "unit": "kg",
+                "recipe_links": [{"recipe_id": recipe.id, "quantity": 0.1, "unit": "kg"}],
+            }]
+        },
+        headers=auth_headers,
+    )
+    assert confirm_resp.status_code == 200
+
+    # Check JSONB has confirmed_recipe_links via direct DB query
+    inv_result = await db_session.execute(select(Invoice).where(Invoice.id == invoice_id))
+    inv = inv_result.scalar_one()
+    found_line = next(
+        (ln for ln in inv.extracted_lines if ln.get("matched_ingredient_id") == ing.id),
+        None,
+    )
+    assert found_line is not None
+    assert "confirmed_recipe_links" in found_line
+    assert len(found_line["confirmed_recipe_links"]) == 1
+    assert found_line["confirmed_recipe_links"][0]["recipe_id"] == recipe.id
+
+
 async def test_invoices_protected(client):
     """Without auth token → 401."""
     resp = await client.get("/api/invoices")

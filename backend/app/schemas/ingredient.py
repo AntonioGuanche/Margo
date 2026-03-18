@@ -82,3 +82,9 @@ class BatchRecipesRequest(BaseModel):
 
 class BatchRecipesResponse(BaseModel):
     results: dict[int, list[IngredientRecipeItem]]
+
+
+# --- Last confirmed recipe links ---
+
+class LastConfirmedLinksRequest(BaseModel):
+    ingredient_ids: list[int]

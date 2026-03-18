@@ -114,11 +114,11 @@ export default function InvoiceReview() {
 
   const recipesList = (recipesData?.items ?? []).map((r) => ({ id: r.id, name: r.name }));
 
-  // Batch-fetch recipes for all matched ingredients after init (FIRST LOAD ONLY)
+  // Pre-fill recipe links: use last confirmed choices, fallback to all linked recipes
   useEffect(() => {
     if (!initialized || recipesPreFilled || lines.length === 0) return;
 
-    // Mark as done IMMEDIATELY to prevent re-runs on re-render
+    // Mark done IMMEDIATELY to prevent re-runs
     setRecipesPreFilled(true);
 
     const ingredientIds = [
@@ -131,17 +131,32 @@ export default function InvoiceReview() {
 
     if (ingredientIds.length === 0) return;
 
+    // Step 1: Try last confirmed choices (respects user's previous removals)
     apiClient<{ results: Record<number, IngredientRecipeItem[]> }>(
-      '/api/ingredients/recipes-batch',
+      '/api/ingredients/last-confirmed-links',
       { method: 'POST', body: { ingredient_ids: ingredientIds } },
     )
-      .then((data) => {
-        setLines((prev) =>
-          prev.map((line) => {
-            // ONLY pre-fill if line has NO recipe links yet
-            if (!line.ingredient_id || line.recipe_links.length > 0) return line;
-            const recipes = data.results[line.ingredient_id] || [];
-            if (recipes.length > 0) {
+      .then((confirmedData) => {
+        // Split: ingredients WITH confirmed history vs WITHOUT
+        const withHistory: number[] = [];
+        const withoutHistory: number[] = [];
+
+        for (const ingId of ingredientIds) {
+          const links = confirmedData.results[ingId];
+          if (links && links.length > 0) {
+            withHistory.push(ingId);
+          } else {
+            withoutHistory.push(ingId);
+          }
+        }
+
+        // Apply confirmed choices
+        if (withHistory.length > 0) {
+          setLines((prev) =>
+            prev.map((line) => {
+              if (!line.ingredient_id || line.recipe_links.length > 0) return line;
+              if (!withHistory.includes(line.ingredient_id)) return line;
+              const recipes = confirmedData.results[line.ingredient_id] || [];
               return {
                 ...line,
                 recipe_links: recipes.map((r) => ({
@@ -152,49 +167,64 @@ export default function InvoiceReview() {
                   is_new: false,
                 })),
               };
-            }
+            }),
+          );
+        }
 
-            // Fallback: match by name similarity
-            const ingName =
-              allIngredients
-                .find((i) => i.id === line.ingredient_id)
-                ?.name?.toLowerCase() ?? '';
-            if (!ingName) return line;
-
-            const stopWords = new Set([
-              'de', 'le', 'la', 'les', 'du', 'des', 'un', 'une',
-              'biere', 'bière', 'vin', 'eau',
-            ]);
-            const ingWords = ingName
-              .split(/[\s-]+/)
-              .filter((w) => w.length > 2 && !stopWords.has(w));
-            if (ingWords.length === 0) return line;
-
-            const matches = recipesList.filter((r) => {
-              const rWords = r.name.toLowerCase().split(/[\s-]+/);
-              return ingWords.some((w) =>
-                rWords.some((rw) => rw.includes(w) || w.includes(rw)),
-              );
-            });
-
-            if (matches.length > 0 && matches.length <= 5) {
-              return {
-                ...line,
-                recipe_links: matches.map((r) => ({
-                  recipe_id: r.id,
-                  recipe_name: r.name,
-                  quantity: 1,
-                  unit: 'piece',
-                  is_new: false,
-                })),
-              };
-            }
-            return line;
-          }),
-        );
+        // Step 2: For ingredients with NO confirmed history, fallback to recipes-batch
+        if (withoutHistory.length > 0) {
+          return apiClient<{ results: Record<number, IngredientRecipeItem[]> }>(
+            '/api/ingredients/recipes-batch',
+            { method: 'POST', body: { ingredient_ids: withoutHistory } },
+          ).then((batchData) => {
+            setLines((prev) =>
+              prev.map((line) => {
+                if (!line.ingredient_id || line.recipe_links.length > 0) return line;
+                if (!withoutHistory.includes(line.ingredient_id)) return line;
+                const recipes = batchData.results[line.ingredient_id] || [];
+                if (recipes.length === 0) return line;
+                return {
+                  ...line,
+                  recipe_links: recipes.map((r) => ({
+                    recipe_id: r.recipe_id,
+                    recipe_name: r.recipe_name,
+                    quantity: r.quantity,
+                    unit: r.unit,
+                    is_new: false,
+                  })),
+                };
+              }),
+            );
+          });
+        }
       })
-      .catch(() => {
-        // Already marked as pre-filled
+      .catch((err) => {
+        // If new endpoint fails (e.g. not deployed yet), fallback entirely to recipes-batch
+        console.warn('last-confirmed-links failed, falling back:', err);
+        apiClient<{ results: Record<number, IngredientRecipeItem[]> }>(
+          '/api/ingredients/recipes-batch',
+          { method: 'POST', body: { ingredient_ids: ingredientIds } },
+        )
+          .then((data) => {
+            setLines((prev) =>
+              prev.map((line) => {
+                if (!line.ingredient_id || line.recipe_links.length > 0) return line;
+                const recipes = data.results[line.ingredient_id] || [];
+                if (recipes.length === 0) return line;
+                return {
+                  ...line,
+                  recipe_links: recipes.map((r) => ({
+                    recipe_id: r.recipe_id,
+                    recipe_name: r.recipe_name,
+                    quantity: r.quantity,
+                    unit: r.unit,
+                    is_new: false,
+                  })),
+                };
+              }),
+            );
+          })
+          .catch(() => {});
       });
   }, [initialized, recipesPreFilled, lines.length]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -21,6 +21,7 @@ from app.schemas.ingredient import (
     IngredientRecipesResponse,
     IngredientResponse,
     IngredientUpdate,
+    LastConfirmedLinksRequest,
     PriceHistoryEntry,
     PriceHistoryResponse,
 )
@@ -109,6 +110,89 @@ async def get_recipes_batch(
                 unit=row.unit,
             )
         )
+
+    return BatchRecipesResponse(results=results)
+
+
+@router.post("/last-confirmed-links", response_model=BatchRecipesResponse)
+async def get_last_confirmed_links(
+    body: LastConfirmedLinksRequest,
+    restaurant: Restaurant = Depends(get_current_restaurant),
+    db: AsyncSession = Depends(get_db),
+) -> BatchRecipesResponse:
+    """Get recipe links from the LAST confirmed invoice for each ingredient.
+
+    Respects user's previous choices (additions AND removals).
+    Returns same shape as recipes-batch for frontend compatibility.
+    Falls back to empty list if no confirmed history exists for an ingredient.
+    """
+    if not body.ingredient_ids:
+        return BatchRecipesResponse(results={})
+
+    # Find confirmed invoices, most recent first
+    result = await db.execute(
+        select(Invoice)
+        .where(
+            Invoice.restaurant_id == restaurant.id,
+            Invoice.status == "confirmed",
+        )
+        .order_by(Invoice.created_at.desc())
+        .limit(50)
+    )
+    confirmed_invoices = result.scalars().all()
+
+    # For each ingredient_id, find the most recent confirmed line
+    raw_links: dict[int, list[dict]] = {}
+    remaining_ids = set(body.ingredient_ids)
+
+    for invoice in confirmed_invoices:
+        if not remaining_ids:
+            break
+        for line_dict in (invoice.extracted_lines or []):
+            ing_id = line_dict.get("matched_ingredient_id")
+            if ing_id not in remaining_ids:
+                continue
+            confirmed = line_dict.get("confirmed_recipe_links")
+            if confirmed is not None:
+                raw_links[ing_id] = confirmed
+                remaining_ids.discard(ing_id)
+
+    # Batch-resolve recipe names (avoid N+1)
+    all_recipe_ids = set()
+    for links in raw_links.values():
+        for rl in links:
+            rid = rl.get("recipe_id")
+            if rid:
+                all_recipe_ids.add(rid)
+
+    recipe_names: dict[int, tuple[str, str | None]] = {}
+    if all_recipe_ids:
+        name_result = await db.execute(
+            select(Recipe.id, Recipe.name, Recipe.category)
+            .where(Recipe.id.in_(all_recipe_ids))
+        )
+        for row in name_result.all():
+            recipe_names[row.id] = (row.name, row.category)
+
+    # Build response (same shape as recipes-batch)
+    results: dict[int, list[IngredientRecipeItem]] = {}
+    for ing_id in body.ingredient_ids:
+        if ing_id in raw_links:
+            items = []
+            for rl in raw_links[ing_id]:
+                rid = rl.get("recipe_id")
+                if rid and rid in recipe_names:
+                    name, category = recipe_names[rid]
+                    items.append(IngredientRecipeItem(
+                        recipe_id=rid,
+                        recipe_name=name,
+                        category=category,
+                        quantity=rl.get("quantity", 1),
+                        unit=rl.get("unit", "piece"),
+                    ))
+            results[ing_id] = items
+        else:
+            results[ing_id] = []
 
     return BatchRecipesResponse(results=results)
 

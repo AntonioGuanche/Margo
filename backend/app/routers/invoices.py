@@ -537,12 +537,24 @@ async def confirm_invoice(
                     if ing_name:
                         updated_lines[i]["matched_ingredient_name"] = ing_name
                     updated_lines[i]["match_confidence"] = "confirmed"
+                    # Save recipe links for future pre-fill on next invoices
+                    updated_lines[i]["confirmed_recipe_links"] = [
+                        {"recipe_id": rl.recipe_id, "quantity": rl.quantity, "unit": rl.unit}
+                        for rl in line.recipe_links
+                        if rl.recipe_id is not None
+                    ]
                 elif line.create_ingredient_name:
                     updated_lines[i]["matched_ingredient_name"] = line.create_ingredient_name.strip()
                     updated_lines[i]["match_confidence"] = "confirmed"
+                    updated_lines[i]["confirmed_recipe_links"] = [
+                        {"recipe_id": rl.recipe_id, "quantity": rl.quantity, "unit": rl.unit}
+                        for rl in line.recipe_links
+                        if rl.recipe_id is not None
+                    ]
                 else:
                     updated_lines[i]["matched_ingredient_id"] = None
                     updated_lines[i]["matched_ingredient_name"] = None
+                    updated_lines[i]["confirmed_recipe_links"] = []
 
         # Force SQLAlchemy to detect JSONB mutation
         invoice.extracted_lines = updated_lines

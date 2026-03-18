@@ -460,3 +460,152 @@ async def test_delete_ingredient_with_recipes(
     assert recipe_row is not None
     # food_cost recalculated — no ingredients left, so 0.0 or None
     assert recipe_row.food_cost is None or recipe_row.food_cost == 0.0
+
+
+# --- LAST CONFIRMED LINKS ---
+
+
+async def test_last_confirmed_links_returns_saved_choices(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    db_session: AsyncSession,
+    restaurant: Restaurant,
+) -> None:
+    """After confirming with specific recipe links, last-confirmed-links returns those."""
+    from pathlib import Path
+
+    xml_file_path = str(Path(__file__).parent / "fixtures" / "test_invoice.xml")
+
+    ing = Ingredient(restaurant_id=restaurant.id, name="IngX", unit="kg", current_price=10.0)
+    db_session.add(ing)
+    await db_session.flush()
+    await db_session.refresh(ing)
+
+    recipe_a = Recipe(restaurant_id=restaurant.id, name="RecipeA", selling_price=15.0)
+    recipe_b = Recipe(restaurant_id=restaurant.id, name="RecipeB", selling_price=18.0)
+    db_session.add_all([recipe_a, recipe_b])
+    await db_session.flush()
+    await db_session.refresh(recipe_a)
+    await db_session.refresh(recipe_b)
+
+    # Link both recipes to ingredient
+    db_session.add(RecipeIngredient(recipe_id=recipe_a.id, ingredient_id=ing.id, quantity=0.1, unit="kg"))
+    db_session.add(RecipeIngredient(recipe_id=recipe_b.id, ingredient_id=ing.id, quantity=0.2, unit="kg"))
+    await db_session.flush()
+
+    # Upload + confirm with ONLY recipe_a (not recipe_b)
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={
+            "lines": [{
+                "description": "Test",
+                "ingredient_id": ing.id,
+                "unit_price": 12.0,
+                "unit": "kg",
+                "recipe_links": [{"recipe_id": recipe_a.id, "quantity": 0.1, "unit": "kg"}],
+            }]
+        },
+        headers=auth_headers,
+    )
+
+    # Call last-confirmed-links
+    resp = await client.post(
+        "/api/ingredients/last-confirmed-links",
+        json={"ingredient_ids": [ing.id]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    links = data["results"][str(ing.id)]
+    assert len(links) == 1
+    assert links[0]["recipe_id"] == recipe_a.id
+    assert links[0]["recipe_name"] == "RecipeA"
+
+
+async def test_last_confirmed_links_no_history(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    db_session: AsyncSession,
+    restaurant: Restaurant,
+) -> None:
+    """Ingredient with no confirmed invoice returns empty list."""
+    ing = Ingredient(restaurant_id=restaurant.id, name="NewIng", unit="kg")
+    db_session.add(ing)
+    await db_session.flush()
+    await db_session.refresh(ing)
+
+    resp = await client.post(
+        "/api/ingredients/last-confirmed-links",
+        json={"ingredient_ids": [ing.id]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["results"][str(ing.id)] == []
+
+
+async def test_last_confirmed_links_deleted_recipe(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    db_session: AsyncSession,
+    restaurant: Restaurant,
+) -> None:
+    """If a saved recipe was deleted, it should be silently skipped."""
+    from pathlib import Path
+
+    xml_file_path = str(Path(__file__).parent / "fixtures" / "test_invoice.xml")
+
+    ing = Ingredient(restaurant_id=restaurant.id, name="IngDel", unit="kg", current_price=10.0)
+    db_session.add(ing)
+    await db_session.flush()
+    await db_session.refresh(ing)
+
+    recipe = Recipe(restaurant_id=restaurant.id, name="WillDelete", selling_price=15.0)
+    db_session.add(recipe)
+    await db_session.flush()
+    await db_session.refresh(recipe)
+    recipe_id = recipe.id
+
+    # Confirm invoice with this recipe
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={
+            "lines": [{
+                "description": "Test",
+                "ingredient_id": ing.id,
+                "unit_price": 12.0,
+                "unit": "kg",
+                "recipe_links": [{"recipe_id": recipe_id, "quantity": 0.1, "unit": "kg"}],
+            }]
+        },
+        headers=auth_headers,
+    )
+
+    # Delete the recipe
+    await client.delete(f"/api/recipes/{recipe_id}", headers=auth_headers)
+
+    # Call last-confirmed-links — deleted recipe should be skipped
+    resp = await client.post(
+        "/api/ingredients/last-confirmed-links",
+        json={"ingredient_ids": [ing.id]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["results"][str(ing.id)] == []
