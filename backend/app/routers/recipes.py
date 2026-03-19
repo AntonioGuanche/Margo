@@ -247,6 +247,23 @@ async def create_recipe(
                 detail=f"Ingrédients introuvables: {sorted(missing)}",
             )
 
+        # Check for duplicate ingredient_ids
+        seen_ids: set[int] = set()
+        duplicate_names: list[str] = []
+        for ri_data in data.ingredients:
+            if ri_data.ingredient_id in seen_ids:
+                ing_name = found_ingredients[ri_data.ingredient_id].name
+                if ing_name not in duplicate_names:
+                    duplicate_names.append(ing_name)
+            seen_ids.add(ri_data.ingredient_id)
+
+        if duplicate_names:
+            names_str = ", ".join(duplicate_names)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Ingrédient en double dans la recette : {names_str}. Supprime le doublon avant de sauvegarder.",
+            )
+
     # Calculate food cost using unit conversion for ALL recipes
     food_cost: float | None = None
     food_cost_percent: float | None = None
@@ -342,6 +359,23 @@ async def update_recipe(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Ingrédients introuvables: {sorted(missing)}",
+            )
+
+        # Check for duplicate ingredient_ids
+        seen_ids: set[int] = set()
+        duplicate_names: list[str] = []
+        for ri_data in data.ingredients:
+            if ri_data.ingredient_id in seen_ids:
+                ing_name = found_ingredients[ri_data.ingredient_id].name
+                if ing_name not in duplicate_names:
+                    duplicate_names.append(ing_name)
+            seen_ids.add(ri_data.ingredient_id)
+
+        if duplicate_names:
+            names_str = ", ".join(duplicate_names)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Ingrédient en double dans la recette : {names_str}. Supprime le doublon avant de sauvegarder.",
             )
 
         # Delete old recipe ingredients

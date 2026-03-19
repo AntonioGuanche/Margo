@@ -536,6 +536,50 @@ async def test_remove_recipe_ingredient(
     assert get_resp.json()["ingredients"][0]["ingredient_name"] == "Saucisse sèche"
 
 
+async def test_update_recipe_duplicate_ingredient_returns_400(
+    client: AsyncClient, auth_headers: dict, db_session, restaurant
+):
+    """PUT with same ingredient_id twice should return 400 with clear message."""
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id, name="Américain préparé", unit="kg", current_price=16.50
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    # Create recipe
+    create_resp = await client.post(
+        "/api/recipes",
+        json={
+            "name": "Filet américain",
+            "selling_price": 18.0,
+            "ingredients": [
+                {"ingredient_id": ingredient.id, "quantity": 120, "unit": "g"},
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    recipe_id = create_resp.json()["id"]
+
+    # Update with same ingredient_id twice
+    update_resp = await client.put(
+        f"/api/recipes/{recipe_id}",
+        json={
+            "name": "Filet américain",
+            "selling_price": 18.0,
+            "ingredients": [
+                {"ingredient_id": ingredient.id, "quantity": 120, "unit": "g"},
+                {"ingredient_id": ingredient.id, "quantity": 150, "unit": "g"},
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert update_resp.status_code == 400
+    assert "double" in update_resp.json()["detail"].lower()
+    assert "Américain préparé" in update_resp.json()["detail"]
+
+
 async def test_remove_recipe_ingredient_not_found(
     client: AsyncClient, auth_headers: dict, db_session, restaurant
 ):
