@@ -1,5 +1,6 @@
 """Tests for ingredients CRUD endpoints."""
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -609,3 +610,63 @@ async def test_last_confirmed_links_deleted_recipe(
     assert resp.status_code == 200
     data = resp.json()
     assert data["results"][str(ing.id)] == []
+
+
+async def test_update_ingredient_unit_change_converts_price(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    db_session: AsyncSession,
+    restaurant: Restaurant,
+) -> None:
+    """Changing unit from kg to g should convert price, not corrupt it."""
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Test viande",
+        unit="kg",
+        current_price=16.50,
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    # Change unit to g (no price change)
+    resp = await client.put(
+        f"/api/ingredients/{ingredient.id}",
+        json={"unit": "g"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["unit"] == "g"
+    # Price should be converted: 16.50 €/kg → 0.0165 €/g
+    assert data["current_price"] == pytest.approx(0.0165, abs=0.0001)
+
+
+async def test_update_ingredient_price_with_subunit_normalizes(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    db_session: AsyncSession,
+    restaurant: Restaurant,
+) -> None:
+    """Providing new price with sub-unit should normalize to base unit."""
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Épice rare",
+        unit="kg",
+        current_price=100.0,
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+    await db_session.refresh(ingredient)
+
+    # Change unit to g AND provide new price in €/g
+    resp = await client.put(
+        f"/api/ingredients/{ingredient.id}",
+        json={"unit": "g", "current_price": 0.05},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    # Should be normalized: 0.05 €/g → 50 €/kg
+    assert data["unit"] == "kg"
+    assert data["current_price"] == pytest.approx(50.0, abs=0.01)

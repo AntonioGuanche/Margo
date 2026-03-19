@@ -100,48 +100,44 @@ export default function InvoiceLineCard({
             <p className="font-medium text-stone-900 truncate">{line.description}</p>
           )}
 
-          {line.is_manual ? (
-            <div className="flex gap-2 mt-1.5">
+          {/* Quantity, unit, price — always editable */}
+          <div className="flex gap-2 mt-1.5 items-center flex-wrap">
+            <div className="flex items-center gap-1">
               <input
                 type="number"
-                value={line.quantity ?? ''}
+                value={displayQty ?? ''}
                 onChange={(e) =>
                   onChange({ quantity: e.target.value ? parseFloat(e.target.value) : null })
                 }
                 placeholder="Qté"
                 step="0.1"
-                className="w-20 border border-stone-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-20 bg-transparent border-b border-transparent hover:border-stone-300 focus:border-blue-500 px-1 py-0.5 text-sm text-stone-700 focus:outline-none transition-colors"
               />
               <input
                 type="text"
                 value={line.unit ?? ''}
                 onChange={(e) => onChange({ unit: e.target.value || null })}
-                placeholder="kg, L, pce..."
-                className="w-24 border border-stone-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="kg"
+                className="w-14 bg-transparent border-b border-transparent hover:border-stone-300 focus:border-blue-500 px-1 py-0.5 text-sm text-stone-500 focus:outline-none transition-colors"
               />
+            </div>
+            <div className="flex items-center gap-1">
               <input
                 type="number"
-                value={line.unit_price ?? ''}
+                value={displayUnitPrice ?? ''}
                 onChange={(e) =>
                   onChange({ unit_price: e.target.value ? parseFloat(e.target.value) : null })
                 }
-                placeholder="Prix unit."
+                placeholder="P.U."
                 step="0.01"
-                className="w-24 border border-stone-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-20 bg-transparent border-b border-transparent hover:border-stone-300 focus:border-blue-500 px-1 py-0.5 text-sm text-stone-700 focus:outline-none transition-colors"
               />
-              <span className="self-center text-sm text-stone-400">€</span>
+              <span className="text-xs text-stone-400">€/{line.unit ?? 'u'}</span>
             </div>
-          ) : (
-            <div className="flex gap-3 text-sm text-stone-500 mt-0.5">
-              {displayQty != null && (
-                <span>
-                  {displayQty} {line.unit ?? ''}
-                </span>
-              )}
-              {displayUnitPrice != null && <span>{displayUnitPrice.toFixed(2)} €/unité</span>}
-              {displayTotal != null && <span>Total: {displayTotal.toFixed(2)} €</span>}
-            </div>
-          )}
+            {displayTotal != null && (
+              <span className="text-sm text-stone-500">Total: {displayTotal.toFixed(2)} €</span>
+            )}
+          </div>
 
           {/* Packaging editor — for all non-manual, non-ignored lines */}
           {!line.is_manual && !line.ignored && (

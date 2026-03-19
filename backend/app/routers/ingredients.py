@@ -25,7 +25,7 @@ from app.schemas.ingredient import (
     PriceHistoryEntry,
     PriceHistoryResponse,
 )
-from app.services.costing import normalize_to_base_unit, recalculate_recipe, recalculate_recipes_for_ingredient
+from app.services.costing import convert_quantity, normalize_to_base_unit, recalculate_recipe, recalculate_recipes_for_ingredient
 from app.services.utils import guess_ingredient_category
 
 router = APIRouter()
@@ -279,14 +279,28 @@ async def update_ingredient(
 
     update_data = data.model_dump(exclude_unset=True)
 
-    # Normalize unit + price if either is being updated
+    # Handle unit and price changes
     if "unit" in update_data or "current_price" in update_data:
-        new_unit = update_data.get("unit", ingredient.unit)
-        new_price = update_data.get("current_price", ingredient.current_price)
-        base_unit, base_price = normalize_to_base_unit(new_unit, new_price)
-        update_data["unit"] = base_unit
+        old_unit = ingredient.unit
+        new_unit = update_data.get("unit", old_unit)
+
         if "current_price" in update_data:
+            # User explicitly provided a new price → normalize to base unit
+            new_price = update_data["current_price"]
+            base_unit, base_price = normalize_to_base_unit(new_unit, new_price)
+            update_data["unit"] = base_unit
             update_data["current_price"] = base_price
+        elif "unit" in update_data and new_unit != old_unit:
+            # User only changed unit (no new price) → convert existing price
+            if ingredient.current_price is not None:
+                converted = convert_quantity(1, old_unit, new_unit)
+                if converted != 1:  # units are compatible
+                    # Convert price: €/old_unit → €/new_unit
+                    # If old=kg new=g: 1kg = 1000g, so €/g = €/kg / 1000
+                    update_data["current_price"] = round(
+                        ingredient.current_price / converted, 6
+                    )
+            # Don't normalize — store in the unit the user chose
 
     # Track if price changed to update last_updated
     price_changed = "current_price" in update_data and update_data["current_price"] != ingredient.current_price
