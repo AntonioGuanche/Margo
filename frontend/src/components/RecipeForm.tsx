@@ -16,11 +16,23 @@ interface IngredientLine {
 
 const CATEGORIES = ['Entrée', 'Plat', 'Dessert', 'Boisson', 'Accompagnement', 'Autre'];
 
-function calculateLineCost(quantity: string, unitCost: number | null | undefined): number | null {
-  if (!quantity || unitCost == null) return null;
-  const q = parseFloat(quantity);
-  if (isNaN(q)) return null;
-  return q * unitCost;
+// Unit conversion factors to base unit (kg for weight, l for volume)
+const UNIT_TO_BASE: Record<string, [string, number]> = {
+  g: ['kg', 0.001],
+  kg: ['kg', 1.0],
+  ml: ['l', 0.001],
+  cl: ['l', 0.01],
+  l: ['l', 1.0],
+  piece: ['piece', 1.0],
+  pce: ['piece', 1.0],
+};
+
+function convertQuantity(qty: number, fromUnit: string, toUnit: string): number {
+  if (fromUnit === toUnit) return qty;
+  const from = UNIT_TO_BASE[fromUnit.toLowerCase()];
+  const to = UNIT_TO_BASE[toUnit.toLowerCase()];
+  if (!from || !to || from[0] !== to[0]) return qty; // incompatible units
+  return qty * from[1] / to[1];
 }
 
 export default function RecipeForm({ recipeId }: { recipeId?: number }) {
@@ -70,14 +82,18 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
     }
   }
 
-  // Live food cost calculation
+  // Live food cost calculation with unit conversion
   let totalCost = 0;
   if (isHomemade) {
     totalCost = lines.reduce((sum, line) => {
       if (!line.ingredient_id) return sum;
       const ing = ingredientsMap.get(line.ingredient_id);
-      const lineCost = calculateLineCost(line.quantity, ing?.current_price ?? line.unit_cost);
-      return sum + (lineCost ?? 0);
+      if (!ing || ing.current_price == null) return sum;
+      const q = parseFloat(line.quantity);
+      if (isNaN(q) || q <= 0) return sum;
+      // Convert recipe quantity to ingredient's base unit before multiplying
+      const convertedQty = convertQuantity(q, line.unit, ing.unit);
+      return sum + convertedQty * ing.current_price;
     }, 0);
   } else if (linkedIngredientId) {
     const linkedIng = ingredientsMap.get(linkedIngredientId);
@@ -292,8 +308,10 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
           <div className="space-y-2">
             {lines.map((line, index) => {
               const ing = line.ingredient_id ? ingredientsMap.get(line.ingredient_id) : null;
-              const unitCost = ing?.current_price ?? line.unit_cost ?? null;
-              const lineCost = calculateLineCost(line.quantity, unitCost);
+              const q = parseFloat(line.quantity);
+              const lineCost = (ing?.current_price != null && !isNaN(q) && q > 0)
+                ? convertQuantity(q, line.unit, ing.unit) * ing.current_price
+                : null;
 
               return (
                 <div key={index} className="bg-white border border-stone-200 rounded-lg p-3">
@@ -339,7 +357,17 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
                       step="0.01"
                       min="0.01"
                     />
-                    <span className="text-sm text-stone-500 w-12">{line.unit}</span>
+                    <select
+                      value={line.unit}
+                      onChange={(e) => updateLine(index, { unit: e.target.value })}
+                      className="border border-stone-300 rounded-lg px-2 py-2 text-sm text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                    >
+                      <option value="g">g</option>
+                      <option value="kg">kg</option>
+                      <option value="cl">cl</option>
+                      <option value="l">l</option>
+                      <option value="piece">pce</option>
+                    </select>
                     {lineCost != null && (
                       <span className="text-sm font-medium text-emerald-600 ml-auto">
                         {lineCost.toFixed(2)} €
