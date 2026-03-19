@@ -659,6 +659,81 @@ async def patch_invoice(
     )
 
 
+@router.post("/{invoice_id}/reset", response_model=InvoiceDetailResponse)
+async def reset_invoice(
+    invoice_id: int,
+    db: AsyncSession = Depends(get_db),
+    restaurant: Restaurant = Depends(get_current_restaurant),
+) -> InvoiceDetailResponse:
+    """Reset a confirmed invoice back to pending_review with fresh ingredient matching."""
+    result = await db.execute(
+        select(Invoice).where(
+            Invoice.id == invoice_id,
+            Invoice.restaurant_id == restaurant.id,
+        )
+    )
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Facture introuvable.",
+        )
+
+    if not invoice.extracted_lines:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Facture sans lignes extraites.",
+        )
+
+    # Reconstruct InvoiceLine objects from JSONB (keep OCR data, discard user choices)
+    from app.services.parser_xml import InvoiceLine
+    raw_lines = [
+        InvoiceLine(
+            description=ld["description"],
+            quantity=ld.get("quantity"),
+            unit=ld.get("unit"),
+            unit_price=ld.get("unit_price"),
+            total_price=ld.get("total_price"),
+            units_per_package=ld.get("units_per_package"),
+        )
+        for ld in invoice.extracted_lines
+    ]
+
+    # Re-run matching with current ingredients (may have changed since original upload)
+    match_results = await match_invoice_lines(db, restaurant.id, raw_lines)
+
+    # Rebuild JSONB lines with fresh matching
+    invoice.extracted_lines = _build_line_responses(match_results)
+    flag_modified(invoice, "extracted_lines")
+
+    # Reset status
+    invoice.status = "pending_review"
+    await db.flush()
+    await db.refresh(invoice)
+
+    logger.info(
+        "Invoice %d reset to pending_review with fresh matching",
+        invoice_id,
+        extra={"restaurant_id": restaurant.id},
+    )
+
+    # Build response
+    lines = [_line_dict_to_response(ld) for ld in (invoice.extracted_lines or [])]
+
+    return InvoiceDetailResponse(
+        id=invoice.id,
+        supplier_name=invoice.supplier_name,
+        invoice_date=str(invoice.invoice_date) if invoice.invoice_date else None,
+        source=invoice.source,
+        format=invoice.format,
+        status=invoice.status,
+        lines=lines,
+        image_url=invoice.image_url,
+        total_amount=invoice.total_amount,
+        created_at=invoice.created_at,
+    )
+
+
 @router.delete("/{invoice_id}", status_code=204)
 async def delete_invoice(
     invoice_id: int,

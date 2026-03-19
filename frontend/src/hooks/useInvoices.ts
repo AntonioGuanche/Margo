@@ -108,6 +108,21 @@ export function usePatchInvoice(invoiceId: number | string) {
   });
 }
 
+export function useResetInvoice() {
+  const queryClient = useQueryClient();
+
+  return useMutation<InvoiceDetailResponse, Error, number>({
+    mutationFn: (id: number) =>
+      apiClient<InvoiceDetailResponse>(`/api/invoices/${id}/reset`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice'] });
+    },
+  });
+}
+
 export function useDeleteInvoice() {
   const queryClient = useQueryClient();
 

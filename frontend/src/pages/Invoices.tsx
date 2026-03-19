@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Clock, CheckCircle, Upload, Trash2, Search } from 'lucide-react';
-import { useInvoices, useDeleteInvoice } from '../hooks/useInvoices';
+import { FileText, Plus, Clock, CheckCircle, Upload, Trash2, Search, RotateCcw } from 'lucide-react';
+import { useInvoices, useDeleteInvoice, useResetInvoice } from '../hooks/useInvoices';
 import { SkeletonList } from '../components/Skeleton';
 import ConfirmModal from '../components/ConfirmModal';
 import type { InvoiceListItem } from '../types';
@@ -49,7 +49,7 @@ function FormatBadge({ format }: { format: string }) {
   );
 }
 
-function InvoiceRow({ invoice, onClick, onDelete }: { invoice: InvoiceListItem; onClick: () => void; onDelete: () => void }) {
+function InvoiceRow({ invoice, onClick, onDelete, onReset }: { invoice: InvoiceListItem; onClick: () => void; onDelete: () => void; onReset: () => void }) {
   const date = invoice.invoice_date
     ? new Date(invoice.invoice_date).toLocaleDateString('fr-BE')
     : '—';
@@ -78,6 +78,15 @@ function InvoiceRow({ invoice, onClick, onDelete }: { invoice: InvoiceListItem; 
           </span>
         )}
         <StatusBadge status={invoice.status} />
+        {invoice.status === 'confirmed' && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onReset(); }}
+            className="p-1.5 text-stone-300 hover:text-orange-600 md:opacity-0 md:group-hover:opacity-100 transition-all"
+            title="Réanalyser"
+          >
+            <RotateCcw size={14} />
+          </button>
+        )}
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
           className="p-1.5 text-stone-300 hover:text-red-600 md:opacity-0 md:group-hover:opacity-100 transition-all"
@@ -99,6 +108,7 @@ export default function Invoices() {
     search || undefined,
   );
   const deleteMutation = useDeleteInvoice();
+  const resetMutation = useResetInvoice();
   const [deleting, setDeleting] = useState<InvoiceListItem | null>(null);
 
   if (isLoading) {
@@ -176,6 +186,11 @@ export default function Invoices() {
               invoice={invoice}
               onClick={() => navigate(`/invoices/${invoice.id}/review`)}
               onDelete={() => setDeleting(invoice)}
+              onReset={() => {
+                if (confirm('Réanalyser cette facture ? Les assignations seront effacées.')) {
+                  resetMutation.mutate(invoice.id);
+                }
+              }}
             />
           ))}
         </div>

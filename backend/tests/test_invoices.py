@@ -1404,6 +1404,61 @@ async def test_patch_empty_draft_links_persists(
     assert data["lines"][0].get("draft_recipe_links") == []
 
 
+async def test_reset_invoice_to_pending(
+    client, auth_headers, db_session, restaurant, xml_file_path
+):
+    """POST /invoices/{id}/reset clears user choices and re-runs matching."""
+    # Setup: ingredient to be matched
+    ingredient = Ingredient(
+        restaurant_id=restaurant.id,
+        name="Beurre doux",
+        unit="kg",
+        current_price=10.0,
+    )
+    db_session.add(ingredient)
+    await db_session.flush()
+
+    # Upload and confirm
+    with open(xml_file_path, "rb") as f:
+        upload_resp = await client.post(
+            "/api/invoices/upload",
+            files={"file": ("test.xml", f, "application/xml")},
+            headers=auth_headers,
+        )
+    invoice_id = upload_resp.json()["invoice_id"]
+
+    await client.post(
+        f"/api/invoices/{invoice_id}/confirm",
+        json={
+            "lines": [
+                {
+                    "description": "Beurre doux",
+                    "ingredient_id": ingredient.id,
+                    "unit_price": 10.0,
+                    "unit": "kg",
+                },
+            ]
+        },
+        headers=auth_headers,
+    )
+
+    # Verify confirmed
+    get_resp = await client.get(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert get_resp.json()["status"] == "confirmed"
+
+    # Reset
+    reset_resp = await client.post(
+        f"/api/invoices/{invoice_id}/reset",
+        headers=auth_headers,
+    )
+    assert reset_resp.status_code == 200
+    data = reset_resp.json()
+    assert data["status"] == "pending_review"
+    # Lines should have fresh matching, not "confirmed"
+    for line in data["lines"]:
+        assert line["match_confidence"] != "confirmed"
+
+
 async def test_invoices_protected(client):
     """Without auth token → 401."""
     resp = await client.get("/api/invoices")
