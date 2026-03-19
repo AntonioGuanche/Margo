@@ -25,6 +25,18 @@ Les catégories possibles :
 - "cocktail" pour les cocktails et boissons préparées (mojito, spritz, kir, gin tonic, etc.)
 - "boisson" pour les boissons en bouteille/canette/fût (bières, sodas, vins, spiritueux purs)
 - "autre" si aucune catégorie ne correspond
+
+IMPORTANT — Sépare les variantes en items distincts :
+Si une ligne de la carte regroupe plusieurs variantes (séparées par /, -, «et», «ou», virgule, ou entre parenthèses), crée UN item par variante avec le même prix.
+Exemples :
+- "Eau plate - pétillante (25cl) 2,50€" → 2 items : "Eau plate (25cl)" à 2.50 et "Eau pétillante (25cl)" à 2.50
+- "Leffe blonde et brune 4,50€" → 2 items : "Leffe blonde" à 4.50 et "Leffe brune" à 4.50
+- "Pepsi Cola / Pepsi Max 3€" → 2 items : "Pepsi Cola" à 3.00 et "Pepsi Max" à 3.00
+- "Coca-Cola, Fanta, Sprite 3€" → 3 items séparés au même prix
+- "Chimay bleue/rouge/triple 6€" → 3 items : "Chimay bleue", "Chimay rouge", "Chimay triple" à 6.00
+- "Tartine fromage 6€" → 1 seul item (pas de variante)
+Ne sépare PAS les compléments ou descriptions : "Steak frites salade" reste 1 item.
+
 Si tu ne vois pas le prix, mets null.
 Si la photo est illisible ou ce n'est pas une carte, retourne []."""
 
