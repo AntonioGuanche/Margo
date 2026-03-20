@@ -84,11 +84,10 @@ app.include_router(restaurants_router, prefix="/api/restaurants", tags=["restaur
 app.include_router(webhooks_router, prefix="/webhooks", tags=["webhooks"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
-# --- Static files for uploads (dev only) ---
-if settings.environment == "development":
-    uploads_dir = Path("uploads")
-    uploads_dir.mkdir(exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# --- Static files for uploads ---
+uploads_dir = Path("uploads")
+uploads_dir.mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 # --- Health check ---
