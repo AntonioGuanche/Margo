@@ -34,6 +34,8 @@ class InvoiceLineResponse(BaseModel):
     suggestions: list[IngredientSuggestion] = []
     ignored: bool = False
     draft_recipe_links: list[dict] | None = None  # User draft of recipe links (pre-confirm)
+    packaging_units: int | None = None
+    packaging_cl_per_unit: int | None = None
 
 
 class InvoiceUploadResponse(BaseModel):
@@ -120,6 +122,9 @@ class InvoiceLinePatchItem(BaseModel):
     unit: str | None = None
     unit_price: float | None = None
     total_price: float | None = None
+    # Packaging overrides
+    packaging_units: int | None = None
+    packaging_cl_per_unit: int | None = None
 
 
 class InvoicePatchRequest(BaseModel):

@@ -164,6 +164,8 @@ def _line_dict_to_response(ld: dict) -> InvoiceLineResponse:
         ],
         ignored=ld.get("ignored", False),
         draft_recipe_links=ld.get("draft_recipe_links"),
+        packaging_units=ld.get("packaging_units"),
+        packaging_cl_per_unit=ld.get("packaging_cl_per_unit"),
     )
 
 
@@ -218,11 +220,16 @@ async def upload_invoice(
     # Save file
     file_path = await save_upload(file, subfolder="invoices")
 
-    # Fetch known ingredient names for OCR context
+    # Fetch known ingredient + recipe names for OCR context
     ing_result = await db.execute(
         select(Ingredient.name).where(Ingredient.restaurant_id == restaurant.id)
     )
-    known_products = list(ing_result.scalars().all())
+    recipe_result = await db.execute(
+        select(Recipe.name).where(Recipe.restaurant_id == restaurant.id)
+    )
+    known_products = list(set(
+        list(ing_result.scalars().all()) + list(recipe_result.scalars().all())
+    ))
 
     # Parse
     parsed = await parse_invoice_file(file_path, file.filename, known_products=known_products)
@@ -409,7 +416,8 @@ async def confirm_invoice(
                     raw_unit = line.unit or "kg"
                     base_unit, base_price = normalize_to_base_unit(raw_unit, line.unit_price)
                     existing_ingredient.current_price = base_price
-                    existing_ingredient.unit = base_unit
+                    if base_unit in ("kg", "l", "piece"):
+                        existing_ingredient.unit = base_unit
                     existing_ingredient.last_updated = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
                     if invoice.supplier_name:
                         existing_ingredient.supplier_name = invoice.supplier_name
@@ -454,7 +462,7 @@ async def confirm_invoice(
                     base_unit, new_price = normalize_to_base_unit(new_unit, new_price)
                     new_unit = base_unit
                 ingredient.current_price = new_price
-                if new_unit:
+                if new_unit and new_unit in ("kg", "l", "piece"):
                     ingredient.unit = new_unit
                 ingredient.last_updated = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
                 if invoice.supplier_name:
@@ -648,6 +656,10 @@ async def patch_invoice(
                     updated_lines[i]["unit_price"] = line_patch.unit_price
                 if line_patch.total_price is not None:
                     updated_lines[i]["total_price"] = line_patch.total_price
+                if line_patch.packaging_units is not None:
+                    updated_lines[i]["packaging_units"] = line_patch.packaging_units
+                if line_patch.packaging_cl_per_unit is not None:
+                    updated_lines[i]["packaging_cl_per_unit"] = line_patch.packaging_cl_per_unit
 
         # Force SQLAlchemy to detect the JSONB mutation
         invoice.extracted_lines = updated_lines

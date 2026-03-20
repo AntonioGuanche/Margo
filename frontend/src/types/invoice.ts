@@ -35,6 +35,8 @@ export interface InvoiceLineResponse {
     create_recipe_category?: string | null;
     create_recipe_is_homemade?: boolean | null;
   }> | null;
+  packaging_units?: number | null;
+  packaging_cl_per_unit?: number | null;
 }
 
 export interface InvoiceUploadResponse {
@@ -111,6 +113,9 @@ export interface InvoiceLinePatchItem {
   unit?: string | null;
   unit_price?: number | null;
   total_price?: number | null;
+  // Packaging overrides
+  packaging_units?: number | null;
+  packaging_cl_per_unit?: number | null;
 }
 
 export interface InvoicePatchRequest {

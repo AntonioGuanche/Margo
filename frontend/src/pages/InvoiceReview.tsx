@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -61,10 +61,11 @@ export default function InvoiceReview() {
     (i: { id: number; name: string }) => ({ id: i.id, name: i.name }),
   );
 
-  // Save line assignments to backend IMMEDIATELY (no debounce — fire and forget)
+  // Save line assignments to backend (fire and forget)
   const saveLinesToBackend = useCallback(
     (currentLines: LineState[]) => {
       if (!id) return;
+      if (showResult) return; // Don't save after confirm
 
       const linePatch = currentLines.map((l) => ({
         matched_ingredient_id: l.ingredient_id,
@@ -90,12 +91,31 @@ export default function InvoiceReview() {
         unit: l.unit,
         unit_price: l.unit_price,
         total_price: l.total_price,
+        packaging_units: l.packaging_units,
+        packaging_cl_per_unit: l.packaging_cl_per_unit,
       }));
 
       patchInvoice.mutate({ lines: linePatch });
     },
-    [id, allIngredients, patchInvoice],
+    [id, allIngredients, patchInvoice, showResult],
   );
+
+  // Debounced save for recipe_links, text edits, packaging (avoids flood)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const debouncedSave = useCallback(
+    (currentLines: LineState[]) => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        saveLinesToBackend(currentLines);
+      }, 800);
+    },
+    [saveLinesToBackend],
+  );
+
+  useEffect(() => () => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+  }, []);
 
   // Initialize line state from fetched data
   if (invoice && !initialized) {
@@ -134,8 +154,8 @@ export default function InvoiceReview() {
             }))
           : [],
         has_draft_recipe_links: (l as any).draft_recipe_links != null,
-        packaging_units: null,
-        packaging_cl_per_unit: null,
+        packaging_units: (l as any).packaging_units ?? null,
+        packaging_cl_per_unit: (l as any).packaging_cl_per_unit ?? null,
       })),
     );
     setEditSupplier(invoice.supplier_name ?? '');
@@ -296,9 +316,13 @@ export default function InvoiceReview() {
         return updated;
       });
 
-      // Save immediately if ingredient assignment, ignored, create, recipe links, or editable fields changed
-      if ('ingredient_id' in updates || 'ignored' in updates || 'create_ingredient_name' in updates || 'recipe_links' in updates || 'description' in updates || 'quantity' in updates || 'unit' in updates || 'unit_price' in updates || 'total_price' in updates) {
+      // IMMEDIATE: ingredient assignment or ignore (user expects visual feedback)
+      if ('ingredient_id' in updates || 'ignored' in updates || 'create_ingredient_name' in updates) {
         saveLinesToBackend(next);
+      }
+      // DEBOUNCED: everything else (recipe_links, description, quantity, unit, price, packaging)
+      else if ('recipe_links' in updates || 'description' in updates || 'quantity' in updates || 'unit' in updates || 'unit_price' in updates || 'total_price' in updates || 'packaging_units' in updates || 'packaging_cl_per_unit' in updates || 'volume_liters' in updates) {
+        debouncedSave(next);
       }
 
       return next;

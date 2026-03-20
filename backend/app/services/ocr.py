@@ -160,7 +160,12 @@ async def extract_invoice_from_image(
         system_prompt = OCR_SYSTEM_PROMPT
         if known_products:
             products_text = ", ".join(known_products[:100])
-            system_prompt += f"\n\nProduits/ingrédients connus du restaurant : {products_text}"
+            system_prompt += (
+                f"\n\nProduits/ingrédients CONNUS du restaurant (utilise cette liste pour CORRIGER "
+                f"les noms mal lus par l'OCR) : {products_text}\n"
+                f"Par exemple, si tu lis 'ROYAL' mais que 'Orval' existe dans la liste, "
+                f"c'est probablement 'ORVAL'. Privilégie les noms de la liste quand il y a un doute."
+            )
 
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
