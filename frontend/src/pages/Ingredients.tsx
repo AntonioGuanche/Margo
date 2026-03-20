@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Plus, Search, Pencil, Trash2, UtensilsCrossed, TrendingUp, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, UtensilsCrossed, TrendingUp, ChevronDown, ChevronRight, Merge } from 'lucide-react';
 import {
   useIngredients,
   useCreateIngredient,
   useUpdateIngredient,
   useDeleteIngredient,
+  useMergeIngredient,
 } from '../hooks/useIngredients';
 import type { Ingredient, UnitType } from '../types';
 import IngredientForm from '../components/IngredientForm';
@@ -53,10 +54,15 @@ export default function Ingredients() {
   const [deleting, setDeleting] = useState<Ingredient | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
+  const [merging, setMerging] = useState<Ingredient | null>(null);
+  const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
+
   const { data, isLoading } = useIngredients(search || undefined);
+  const ingredientsList = useIngredients(); // unfiltered for merge dropdown
   const createMutation = useCreateIngredient();
   const updateMutation = useUpdateIngredient();
   const deleteMutation = useDeleteIngredient();
+  const mergeMutation = useMergeIngredient();
 
   function handleCreate(formData: {
     name: string;
@@ -222,6 +228,13 @@ export default function Ingredients() {
                               <Pencil size={16} />
                             </button>
                             <button
+                              onClick={() => setMerging(ingredient)}
+                              className="p-2 text-stone-400 hover:text-blue-600 transition-colors"
+                              title="Fusionner avec un autre ingrédient"
+                            >
+                              <Merge size={16} />
+                            </button>
+                            <button
                               onClick={() => setDeleting(ingredient)}
                               className="p-2 text-stone-400 hover:text-red-600 transition-colors"
                               title="Supprimer"
@@ -284,6 +297,68 @@ export default function Ingredients() {
           onCancel={() => setDeleting(null)}
           isLoading={deleteMutation.isPending}
         />
+      )}
+
+      {/* Merge modal */}
+      {merging && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-stone-900 mb-1">
+              Fusionner « {merging.name} »
+            </h3>
+            <p className="text-sm text-stone-500 mb-4">
+              Tous les liens recette, alias et historique de prix seront transférés vers l'ingrédient cible.
+              « {merging.name} » sera ensuite supprimé.
+            </p>
+
+            <label className="block text-sm font-medium text-stone-700 mb-1">
+              Fusionner dans :
+            </label>
+            <select
+              value={mergeTargetId ?? ''}
+              onChange={(e) => setMergeTargetId(e.target.value ? parseInt(e.target.value) : null)}
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm mb-4"
+            >
+              <option value="">Choisir un ingrédient cible...</option>
+              {(ingredientsList.data?.items ?? [])
+                .filter((ing) => ing.id !== merging.id)
+                .map((ing) => (
+                  <option key={ing.id} value={ing.id}>
+                    {ing.name} ({ing.unit}{ing.current_price != null ? ` — ${ing.current_price.toFixed(2)} €` : ''})
+                  </option>
+                ))}
+            </select>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (!mergeTargetId) return;
+                  mergeMutation.mutate(
+                    { sourceId: merging.id, targetId: mergeTargetId },
+                    {
+                      onSuccess: (target) => {
+                        toast.success(`« ${merging.name} » fusionné dans « ${target.name} »`);
+                        setMerging(null);
+                        setMergeTargetId(null);
+                      },
+                      onError: (err) => toast.error(err.message),
+                    },
+                  );
+                }}
+                disabled={!mergeTargetId || mergeMutation.isPending}
+                className="flex-1 bg-blue-600 text-white rounded-lg px-3 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {mergeMutation.isPending ? 'Fusion...' : 'Fusionner'}
+              </button>
+              <button
+                onClick={() => { setMerging(null); setMergeTargetId(null); }}
+                className="px-3 py-2 text-sm text-stone-500 hover:text-stone-700"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

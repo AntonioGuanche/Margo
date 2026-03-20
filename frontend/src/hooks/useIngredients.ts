@@ -66,6 +66,21 @@ export function useDeleteIngredient() {
   });
 }
 
+export function useMergeIngredient() {
+  const queryClient = useQueryClient();
+
+  return useMutation<Ingredient, Error, { sourceId: number; targetId: number }>({
+    mutationFn: ({ sourceId, targetId }) =>
+      apiClient<Ingredient>(`/api/ingredients/${sourceId}/merge/${targetId}`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ingredients'] });
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    },
+  });
+}
+
 export function usePriceHistory(ingredientId: number | undefined) {
   return useQuery<PriceHistoryResponse>({
     queryKey: ['price-history', ingredientId],

@@ -1,13 +1,14 @@
 """CRUD routes for ingredients."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_restaurant
 from app.models.ingredient import Ingredient
+from app.models.ingredient_alias import IngredientAlias
 from app.models.invoice import Invoice
 from app.models.price_history import IngredientPriceHistory
 from app.models.recipe import Recipe, RecipeIngredient
@@ -422,6 +423,89 @@ async def get_ingredient_recipes(
         for row in rows.all()
     ]
     return IngredientRecipesResponse(items=items)
+
+
+@router.post("/{ingredient_id}/merge/{target_id}", response_model=IngredientResponse)
+async def merge_ingredient(
+    ingredient_id: int,
+    target_id: int,
+    db: AsyncSession = Depends(get_db),
+    restaurant: Restaurant = Depends(get_current_restaurant),
+) -> IngredientResponse:
+    """Merge ingredient into target: transfer all recipe links, aliases, then delete source."""
+    if ingredient_id == target_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Impossible de fusionner un ingrédient avec lui-même.",
+        )
+
+    # Verify both ingredients belong to restaurant
+    source_result = await db.execute(
+        select(Ingredient).where(
+            Ingredient.id == ingredient_id,
+            Ingredient.restaurant_id == restaurant.id,
+        )
+    )
+    source = source_result.scalar_one_or_none()
+    if not source:
+        raise HTTPException(status_code=404, detail="Ingrédient source introuvable.")
+
+    target_result = await db.execute(
+        select(Ingredient).where(
+            Ingredient.id == target_id,
+            Ingredient.restaurant_id == restaurant.id,
+        )
+    )
+    target = target_result.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="Ingrédient cible introuvable.")
+
+    # Transfer recipe ingredients (skip duplicates — same recipe already has target)
+    existing_links = await db.execute(
+        select(RecipeIngredient.recipe_id).where(
+            RecipeIngredient.ingredient_id == target_id
+        )
+    )
+    existing_recipe_ids = set(existing_links.scalars().all())
+
+    source_links = await db.execute(
+        select(RecipeIngredient).where(
+            RecipeIngredient.ingredient_id == ingredient_id
+        )
+    )
+    affected_recipe_ids: set[int] = set()
+    for ri in source_links.scalars().all():
+        if ri.recipe_id not in existing_recipe_ids:
+            ri.ingredient_id = target_id
+            affected_recipe_ids.add(ri.recipe_id)
+        else:
+            await db.delete(ri)
+            affected_recipe_ids.add(ri.recipe_id)
+
+    # Transfer aliases
+    await db.execute(
+        update(IngredientAlias)
+        .where(IngredientAlias.ingredient_id == ingredient_id)
+        .values(ingredient_id=target_id)
+    )
+
+    # Transfer price history
+    await db.execute(
+        update(IngredientPriceHistory)
+        .where(IngredientPriceHistory.ingredient_id == ingredient_id)
+        .values(ingredient_id=target_id)
+    )
+
+    # Delete source ingredient
+    await db.delete(source)
+    await db.flush()
+
+    # Recalculate affected recipes
+    for recipe_id in affected_recipe_ids:
+        await recalculate_recipe(db, recipe_id)
+
+    await db.refresh(target)
+    return IngredientResponse.model_validate(target)
 
 
 @router.delete("/{ingredient_id}", status_code=status.HTTP_204_NO_CONTENT)
