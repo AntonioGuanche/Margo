@@ -605,13 +605,13 @@ export default function InvoiceReview() {
             <div className="rounded-xl border border-stone-200 overflow-hidden bg-stone-50 max-h-[50vh] lg:max-h-none" style={{ height: 'calc(100vh - 8rem)' }}>
               {invoice.format === 'pdf' ? (
                 <iframe
-                  src={invoice.image_url}
+                  src={`/${invoice.image_url}`}
                   className="w-full h-full"
                   title="Facture originale"
                 />
               ) : (
                 <img
-                  src={invoice.image_url}
+                  src={`/${invoice.image_url}`}
                   alt="Facture originale"
                   className="w-full h-auto object-contain p-2"
                 />
