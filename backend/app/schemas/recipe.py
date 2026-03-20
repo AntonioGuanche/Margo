@@ -22,6 +22,9 @@ class RecipeIngredientResponse(BaseModel):
     unit_cost: float | None
     unit_cost_unit: str | None = None
     line_cost: float | None
+    converted_quantity: float | None = None
+    conversion_ok: bool = True
+    supplier_name: str | None = None
 
 
 class RecipeCreate(BaseModel):

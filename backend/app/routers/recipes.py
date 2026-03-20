@@ -20,7 +20,7 @@ from app.schemas.recipe import (
     RecipeUpdate,
 )
 from app.middleware.plan_limits import require_recipe_quota
-from app.services.costing import calculate_food_cost, convert_quantity, get_margin_status, recalculate_recipe
+from app.services.costing import UNIT_TO_BASE, calculate_food_cost, convert_quantity, get_margin_status, recalculate_recipe
 
 router = APIRouter()
 
@@ -49,11 +49,21 @@ def _build_recipe_response(recipe: Recipe) -> RecipeResponse:
     ingredient_responses = []
     for ri in recipe.recipe_ingredients:
         unit_cost = ri.ingredient.current_price
+        converted_qty = convert_quantity(ri.quantity, ri.unit, ri.ingredient.unit)
+
+        # Check if conversion worked (incompatible units return qty unchanged)
+        conversion_ok = True
+        if ri.unit.lower() != ri.ingredient.unit.lower():
+            from_info = UNIT_TO_BASE.get(ri.unit.lower())
+            to_info = UNIT_TO_BASE.get(ri.ingredient.unit.lower())
+            if from_info is None or to_info is None or from_info[0] != to_info[0]:
+                conversion_ok = False
+
         if unit_cost is not None:
-            converted_qty = convert_quantity(ri.quantity, ri.unit, ri.ingredient.unit)
             line_cost = round(converted_qty * unit_cost, 4)
         else:
             line_cost = None
+
         ingredient_responses.append(
             RecipeIngredientResponse(
                 id=ri.id,
@@ -64,6 +74,9 @@ def _build_recipe_response(recipe: Recipe) -> RecipeResponse:
                 unit_cost=unit_cost,
                 unit_cost_unit=ri.ingredient.unit,
                 line_cost=line_cost,
+                converted_quantity=round(converted_qty, 6),
+                conversion_ok=conversion_ok,
+                supplier_name=ri.ingredient.supplier_name,
             )
         )
 

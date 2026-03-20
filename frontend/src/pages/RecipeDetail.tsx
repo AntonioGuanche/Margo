@@ -124,42 +124,72 @@ export default function RecipeDetail() {
       </h3>
       <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-100 overflow-hidden">
         {recipe.ingredients.map((ri) => (
-          <div key={ri.id} className="px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-stone-900">{ri.ingredient_name}</span>
-              <span className="text-sm text-stone-500">
-                {ri.quantity} {ri.unit}
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                {ri.unit_cost != null ? (
-                  <>
-                    <p className="text-xs text-stone-400">
-                      {ri.unit_cost.toFixed(2)} €/{ri.unit_cost_unit ?? ri.unit}
-                    </p>
+          <div key={ri.id} className="px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-stone-900">{ri.ingredient_name}</span>
+                <span className="text-sm text-stone-500">
+                  {ri.quantity} {ri.unit}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  {ri.unit_cost != null ? (
                     <p className="text-sm font-medium text-stone-700">
                       {ri.line_cost != null ? `${ri.line_cost.toFixed(2)} €` : '—'}
                     </p>
-                  </>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                    <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-                    Prix manquant
-                  </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+                      Prix manquant
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    setIngredientToRemove(ri);
+                    setShowRemoveConfirm(true);
+                  }}
+                  className="p-1 text-stone-300 hover:text-red-500 transition-colors"
+                  title="Retirer de la recette"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Calculation detail */}
+            {ri.unit_cost != null && (
+              <div className="mt-1 text-xs text-stone-400 flex items-center gap-1 flex-wrap">
+                <span>{ri.quantity} {ri.unit}</span>
+
+                {ri.unit !== (ri.unit_cost_unit ?? ri.unit) && (
+                  ri.conversion_ok !== false ? (
+                    <span>→ {ri.converted_quantity} {ri.unit_cost_unit}</span>
+                  ) : (
+                    <span className="text-red-500 font-medium">
+                      ({ri.unit} ≠ {ri.unit_cost_unit})
+                    </span>
+                  )
+                )}
+
+                <span>× {ri.unit_cost.toFixed(2)} €/{ri.unit_cost_unit}</span>
+                {ri.line_cost != null && (
+                  <span className="font-medium text-stone-600">= {ri.line_cost.toFixed(2)} €</span>
+                )}
+                {ri.supplier_name && (
+                  <span className="text-stone-300">— {ri.supplier_name}</span>
                 )}
               </div>
-              <button
-                onClick={() => {
-                  setIngredientToRemove(ri);
-                  setShowRemoveConfirm(true);
-                }}
-                className="p-1 text-stone-300 hover:text-red-500 transition-colors"
-                title="Retirer de la recette"
-              >
-                <X size={14} />
-              </button>
-            </div>
+            )}
+
+            {/* Incompatible unit warning */}
+            {ri.conversion_ok === false && (
+              <div className="mt-1.5 px-2 py-1.5 bg-red-50 border border-red-100 rounded text-xs text-red-600">
+                L'unité « {ri.unit} » n'est pas convertible vers « {ri.unit_cost_unit} ».
+                Modifie la recette pour corriger (ex: remplace « {ri.unit} » par « cl » ou « l »).
+              </div>
+            )}
           </div>
         ))}
 

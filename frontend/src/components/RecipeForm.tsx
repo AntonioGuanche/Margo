@@ -48,6 +48,8 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
   const [targetMargin, setTargetMargin] = useState('');
   const [isHomemade, setIsHomemade] = useState(true);
   const [linkedIngredientId, setLinkedIngredientId] = useState<number | null>(null);
+  const [linkedQuantity, setLinkedQuantity] = useState<string>('1');
+  const [linkedUnit, setLinkedUnit] = useState<string>('piece');
   const [lines, setLines] = useState<IngredientLine[]>([
     { ingredient_id: null, quantity: '', unit: 'kg' },
   ]);
@@ -62,6 +64,8 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
       setIsHomemade(existingRecipe.is_homemade);
       if (!existingRecipe.is_homemade && existingRecipe.ingredients.length > 0) {
         setLinkedIngredientId(existingRecipe.ingredients[0].ingredient_id);
+        setLinkedQuantity(existingRecipe.ingredients[0].quantity.toString());
+        setLinkedUnit(existingRecipe.ingredients[0].unit);
       }
       setLines(
         existingRecipe.ingredients.map((ri) => ({
@@ -97,7 +101,11 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
     }, 0);
   } else if (linkedIngredientId) {
     const linkedIng = ingredientsMap.get(linkedIngredientId);
-    totalCost = linkedIng?.current_price ?? 0;
+    if (linkedIng?.current_price != null) {
+      const q = parseFloat(linkedQuantity) || 0;
+      const convertedQty = convertQuantity(q, linkedUnit, linkedIng.unit);
+      totalCost = convertedQty * linkedIng.current_price;
+    }
   }
 
   const sp = parseFloat(sellingPrice);
@@ -145,9 +153,9 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
         unit: l.unit,
       }));
     } else if (linkedIngredientId) {
-      // Bought product: link single ingredient with quantity=1
-      const linkedIng = ingredientsMap.get(linkedIngredientId);
-      ingredients = [{ ingredient_id: linkedIngredientId, quantity: 1, unit: linkedIng?.unit ?? 'piece' }];
+      // Bought product: link with user-specified serving quantity
+      const q = parseFloat(linkedQuantity) || 1;
+      ingredients = [{ ingredient_id: linkedIngredientId, quantity: q, unit: linkedUnit }];
     }
 
     const payload = {
@@ -279,7 +287,17 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
             <label className="block text-sm font-medium text-stone-700 mb-1">Ingrédient lié (produit acheté)</label>
             <select
               value={linkedIngredientId ?? ''}
-              onChange={(e) => setLinkedIngredientId(e.target.value ? parseInt(e.target.value) : null)}
+              onChange={(e) => {
+                const newId = e.target.value ? parseInt(e.target.value) : null;
+                setLinkedIngredientId(newId);
+                if (newId) {
+                  const ing = ingredientsMap.get(newId);
+                  if (ing) {
+                    setLinkedUnit(ing.unit);
+                    setLinkedQuantity('1');
+                  }
+                }
+              }}
               className="w-full border border-stone-300 rounded-lg px-3 py-2 text-stone-900 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
             >
               <option value="">Choisir un ingrédient...</option>
@@ -293,12 +311,36 @@ export default function RecipeForm({ recipeId }: { recipeId?: number }) {
               const linked = ingredientsMap.get(linkedIngredientId);
               return linked?.current_price != null ? (
                 <p className="text-sm text-stone-500 mt-1">
-                  Prix d’achat : <span className="font-semibold text-stone-900">{linked.current_price.toFixed(2)} €</span>
+                  Prix d’achat : <span className="font-semibold text-stone-900">{linked.current_price.toFixed(2)} €/{linked.unit}</span>
                 </p>
               ) : (
                 <p className="text-sm text-stone-400 mt-1">Pas encore de prix d’achat</p>
               );
             })()}
+            {linkedIngredientId && (
+              <div className="flex gap-2 mt-2 items-center">
+                <label className="text-sm text-stone-500">Portion servie :</label>
+                <input
+                  type="number"
+                  value={linkedQuantity}
+                  onChange={(e) => setLinkedQuantity(e.target.value)}
+                  step="0.01"
+                  min="0.01"
+                  className="w-20 border border-stone-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                />
+                <select
+                  value={linkedUnit}
+                  onChange={(e) => setLinkedUnit(e.target.value)}
+                  className="border border-stone-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                >
+                  <option value="g">g</option>
+                  <option value="kg">kg</option>
+                  <option value="cl">cl</option>
+                  <option value="l">l</option>
+                  <option value="piece">pce</option>
+                </select>
+              </div>
+            )}
           </div>
         )}
 

@@ -11,6 +11,9 @@ export interface RecipeIngredientResponse {
   unit_cost: number | null;
   unit_cost_unit: string | null;
   line_cost: number | null;
+  converted_quantity?: number | null;
+  conversion_ok?: boolean;
+  supplier_name?: string | null;
 }
 
 export interface RecipeListItem {
