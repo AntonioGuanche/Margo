@@ -93,7 +93,10 @@ def _build_content_block(file_data: bytes, mime_type: str) -> dict:
         }
 
 
-async def extract_invoice_from_image(image_path: str) -> ParsedInvoice:
+async def extract_invoice_from_image(
+    image_path: str,
+    known_products: list[str] | None = None,
+) -> ParsedInvoice:
     """Send image or PDF to Claude for structured extraction.
 
     Supports: JPEG, PNG, WebP, GIF (as images) and PDF (as documents).
@@ -154,10 +157,15 @@ async def extract_invoice_from_image(image_path: str) -> ParsedInvoice:
 
         content_block = _build_content_block(file_data, mime_type)
 
+        system_prompt = OCR_SYSTEM_PROMPT
+        if known_products:
+            products_text = ", ".join(known_products[:100])
+            system_prompt += f"\n\nProduits/ingrédients connus du restaurant : {products_text}"
+
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4096,
-            system=OCR_SYSTEM_PROMPT,
+            system=system_prompt,
             messages=[
                 {
                     "role": "user",

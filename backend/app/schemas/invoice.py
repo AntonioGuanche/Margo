@@ -114,6 +114,12 @@ class InvoiceLinePatchItem(BaseModel):
     matched_ingredient_name: str | None = None
     ignored: bool = False
     draft_recipe_links: list[dict] | None = None  # User draft of recipe links (pre-confirm)
+    # Editable line fields
+    description: str | None = None
+    quantity: float | None = None
+    unit: str | None = None
+    unit_price: float | None = None
+    total_price: float | None = None
 
 
 class InvoicePatchRequest(BaseModel):

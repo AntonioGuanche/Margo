@@ -105,6 +105,12 @@ export interface InvoiceLinePatchItem {
     create_recipe_category?: string | null;
     create_recipe_is_homemade?: boolean | null;
   }> | null;
+  // Editable line fields
+  description?: string | null;
+  quantity?: number | null;
+  unit?: string | null;
+  unit_price?: number | null;
+  total_price?: number | null;
 }
 
 export interface InvoicePatchRequest {

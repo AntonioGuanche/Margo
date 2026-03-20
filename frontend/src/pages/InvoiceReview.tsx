@@ -85,6 +85,11 @@ export default function InvoiceReview() {
               create_recipe_is_homemade: rl.create_recipe_is_homemade ?? null,
             }))
           : null,
+        description: l.description,
+        quantity: l.quantity,
+        unit: l.unit,
+        unit_price: l.unit_price,
+        total_price: l.total_price,
       }));
 
       patchInvoice.mutate({ lines: linePatch });
@@ -291,8 +296,8 @@ export default function InvoiceReview() {
         return updated;
       });
 
-      // Save immediately if ingredient assignment, ignored, create, or recipe links changed
-      if ('ingredient_id' in updates || 'ignored' in updates || 'create_ingredient_name' in updates || 'recipe_links' in updates) {
+      // Save immediately if ingredient assignment, ignored, create, recipe links, or editable fields changed
+      if ('ingredient_id' in updates || 'ignored' in updates || 'create_ingredient_name' in updates || 'recipe_links' in updates || 'description' in updates || 'quantity' in updates || 'unit' in updates || 'unit_price' in updates || 'total_price' in updates) {
         saveLinesToBackend(next);
       }
 

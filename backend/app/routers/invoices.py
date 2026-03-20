@@ -218,8 +218,14 @@ async def upload_invoice(
     # Save file
     file_path = await save_upload(file, subfolder="invoices")
 
+    # Fetch known ingredient names for OCR context
+    ing_result = await db.execute(
+        select(Ingredient.name).where(Ingredient.restaurant_id == restaurant.id)
+    )
+    known_products = list(ing_result.scalars().all())
+
     # Parse
-    parsed = await parse_invoice_file(file_path, file.filename)
+    parsed = await parse_invoice_file(file_path, file.filename, known_products=known_products)
 
     # Match lines to ingredients
     match_results = await match_invoice_lines(db, restaurant.id, parsed.lines)
@@ -397,12 +403,13 @@ async def confirm_invoice(
             existing_ingredient = existing_result.scalar_one_or_none()
 
             if existing_ingredient:
-                # Reuse existing ingredient — update price if available
+                # Reuse existing ingredient — update price and unit if available
                 ingredient_id = existing_ingredient.id
                 if line.unit_price is not None:
                     raw_unit = line.unit or "kg"
-                    _, base_price = normalize_to_base_unit(raw_unit, line.unit_price)
+                    base_unit, base_price = normalize_to_base_unit(raw_unit, line.unit_price)
                     existing_ingredient.current_price = base_price
+                    existing_ingredient.unit = base_unit
                     existing_ingredient.last_updated = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
                     if invoice.supplier_name:
                         existing_ingredient.supplier_name = invoice.supplier_name
@@ -440,11 +447,15 @@ async def confirm_invoice(
             ingredient = ing_result.scalar_one_or_none()
             if ingredient:
                 old_price = ingredient.current_price
-                # Normalize line price to base unit using normalize_to_base_unit
+                # Normalize line price to base unit and update ingredient unit
                 new_price = line.unit_price
-                if new_price is not None and line.unit:
-                    _, new_price = normalize_to_base_unit(line.unit, new_price)
+                new_unit = line.unit
+                if new_price is not None and new_unit:
+                    base_unit, new_price = normalize_to_base_unit(new_unit, new_price)
+                    new_unit = base_unit
                 ingredient.current_price = new_price
+                if new_unit:
+                    ingredient.unit = new_unit
                 ingredient.last_updated = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
                 if invoice.supplier_name:
                     ingredient.supplier_name = invoice.supplier_name
@@ -626,6 +637,17 @@ async def patch_invoice(
                 updated_lines[i]["ignored"] = line_patch.ignored
                 if line_patch.draft_recipe_links is not None:
                     updated_lines[i]["draft_recipe_links"] = line_patch.draft_recipe_links
+                # Save editable line fields if provided
+                if line_patch.description is not None:
+                    updated_lines[i]["description"] = line_patch.description
+                if line_patch.quantity is not None:
+                    updated_lines[i]["quantity"] = line_patch.quantity
+                if line_patch.unit is not None:
+                    updated_lines[i]["unit"] = line_patch.unit
+                if line_patch.unit_price is not None:
+                    updated_lines[i]["unit_price"] = line_patch.unit_price
+                if line_patch.total_price is not None:
+                    updated_lines[i]["total_price"] = line_patch.total_price
 
         # Force SQLAlchemy to detect the JSONB mutation
         invoice.extracted_lines = updated_lines

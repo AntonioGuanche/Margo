@@ -6,7 +6,11 @@ from app.services.parser_xml import InvoiceLine, ParsedInvoice
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff"}
 
 
-async def parse_invoice_file(file_path: str, filename: str) -> ParsedInvoice:
+async def parse_invoice_file(
+    file_path: str,
+    filename: str,
+    known_products: list[str] | None = None,
+) -> ParsedInvoice:
     """Detect format and route to the correct parser.
 
     Detection by extension AND content:
@@ -28,7 +32,7 @@ async def parse_invoice_file(file_path: str, filename: str) -> ParsedInvoice:
         # PDF fallback: if pdfplumber extracted zero lines, try OCR
         if not result.lines:
             from app.services.ocr import extract_invoice_from_image
-            ocr_result = await extract_invoice_from_image(file_path)
+            ocr_result = await extract_invoice_from_image(file_path, known_products=known_products)
             if ocr_result.lines:
                 return ocr_result
         return result
@@ -36,7 +40,7 @@ async def parse_invoice_file(file_path: str, filename: str) -> ParsedInvoice:
     # Image extensions → OCR
     if any(filename_lower.endswith(ext) for ext in IMAGE_EXTENSIONS):
         from app.services.ocr import extract_invoice_from_image
-        return await extract_invoice_from_image(file_path)
+        return await extract_invoice_from_image(file_path, known_products=known_products)
 
     # Detect by content (first bytes)
     try:
@@ -52,7 +56,7 @@ async def parse_invoice_file(file_path: str, filename: str) -> ParsedInvoice:
             result = await parse_pdf(file_path)
             if not result.lines:
                 from app.services.ocr import extract_invoice_from_image
-                ocr_result = await extract_invoice_from_image(file_path)
+                ocr_result = await extract_invoice_from_image(file_path, known_products=known_products)
                 if ocr_result.lines:
                     return ocr_result
             return result
@@ -61,4 +65,4 @@ async def parse_invoice_file(file_path: str, filename: str) -> ParsedInvoice:
 
     # Unknown → try OCR as last resort
     from app.services.ocr import extract_invoice_from_image
-    return await extract_invoice_from_image(file_path)
+    return await extract_invoice_from_image(file_path, known_products=known_products)
