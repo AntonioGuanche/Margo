@@ -88,17 +88,12 @@ export default function InvoiceLineCard({
       {/* Header */}
       <div className="flex items-start justify-between gap-2 flex-wrap sm:flex-nowrap mb-3">
         <div className="flex-1 min-w-0">
-          {line.is_manual ? (
-            <input
-              type="text"
-              value={line.description}
-              onChange={(e) => onChange({ description: e.target.value })}
-              placeholder="Nom du produit"
-              className="font-medium text-stone-900 w-full bg-transparent border-b border-blue-200 focus:border-blue-500 focus:outline-none py-0.5"
-            />
-          ) : (
-            <p className="font-medium text-stone-900 truncate">{line.description}</p>
-          )}
+          <input
+            type="text"
+            value={line.description}
+            onChange={(e) => onChange({ description: e.target.value })}
+            className="font-medium text-stone-900 w-full bg-transparent border-b border-transparent hover:border-stone-300 focus:border-blue-500 focus:outline-none py-0.5 truncate transition-colors"
+          />
 
           {/* Quantity, unit, price — always editable */}
           <div className="flex gap-2 mt-1.5 items-center flex-wrap">

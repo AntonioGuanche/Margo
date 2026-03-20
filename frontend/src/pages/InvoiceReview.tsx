@@ -4,13 +4,14 @@ import toast from 'react-hot-toast';
 import {
   ArrowLeft,
   FileCheck,
-  FileText,
   Check,
   Plus,
   Loader2,
   Pencil,
   ChevronDown,
   ChevronRight,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useInvoice, useConfirmInvoice, usePatchInvoice } from '../hooks/useInvoices';
 import { useIngredients, useUpdateIngredient } from '../hooks/useIngredients';
@@ -54,6 +55,7 @@ export default function InvoiceReview() {
   const [editDate, setEditDate] = useState('');
   const [showIgnored, setShowIgnored] = useState(true);
   const [useAbsolutePrices, setUseAbsolutePrices] = useState(false);
+  const [showDocument, setShowDocument] = useState(window.innerWidth >= 1024);
 
   const allIngredients: IngredientItem[] = (ingredientsData?.items ?? []).map(
     (i: { id: number; name: string }) => ({ id: i.id, name: i.name }),
@@ -562,20 +564,6 @@ export default function InvoiceReview() {
             <span className="text-stone-500">Format</span>
             <p className="font-medium text-stone-900 uppercase">{invoice.format}</p>
           </div>
-          {invoice.image_url && (
-            <div>
-              <span className="text-stone-500">Document</span>
-              <a
-                href={`/${invoice.image_url}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-sm font-medium text-orange-700 hover:text-orange-800 hover:underline"
-              >
-                <FileText size={14} />
-                Voir l'original
-              </a>
-            </div>
-          )}
           {/* Toggle valeur absolue — affiché seulement si des prix négatifs existent */}
           {lines.some(l => (l.unit_price != null && l.unit_price < 0) || (l.total_price != null && l.total_price < 0)) && (
             <div className="sm:col-span-2 flex items-center gap-3 pt-2 border-t border-stone-100">
@@ -597,6 +585,54 @@ export default function InvoiceReview() {
           )}
         </div>
       </div>
+
+      {/* Split-view container */}
+      <div className="flex flex-col lg:flex-row gap-4">
+
+        {/* Left panel: document viewer */}
+        {showDocument && invoice.image_url && (
+          <div className="lg:w-1/2 lg:sticky lg:top-4 lg:self-start">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-stone-500">Document original</span>
+              <button
+                onClick={() => setShowDocument(false)}
+                className="text-xs text-stone-400 hover:text-stone-600 flex items-center gap-1"
+              >
+                <EyeOff size={12} />
+                Masquer
+              </button>
+            </div>
+            <div className="rounded-xl border border-stone-200 overflow-hidden bg-stone-50 max-h-[50vh] lg:max-h-none" style={{ height: 'calc(100vh - 8rem)' }}>
+              {invoice.format === 'pdf' ? (
+                <iframe
+                  src={invoice.image_url}
+                  className="w-full h-full"
+                  title="Facture originale"
+                />
+              ) : (
+                <img
+                  src={invoice.image_url}
+                  alt="Facture originale"
+                  className="w-full h-auto object-contain p-2"
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Right panel: lines + confirm */}
+        <div className={showDocument && invoice.image_url ? 'lg:w-1/2 min-w-0' : 'w-full'}>
+
+          {/* Show document button (when hidden) */}
+          {!showDocument && invoice.image_url && (
+            <button
+              onClick={() => setShowDocument(true)}
+              className="mb-3 text-sm text-orange-700 hover:text-orange-800 flex items-center gap-1"
+            >
+              <Eye size={14} />
+              Afficher le document original
+            </button>
+          )}
 
       {/* Lines header */}
       <h3 className="text-sm font-medium text-stone-500 uppercase tracking-wide mb-2">
@@ -733,6 +769,9 @@ export default function InvoiceReview() {
           {confirm.error.message}
         </div>
       )}
+
+        </div> {/* fin right panel */}
+      </div> {/* fin split-view container */}
     </div>
   );
 }
