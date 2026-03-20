@@ -119,13 +119,13 @@ def test_parse_packaging_belgian_notation():
     assert result["total_volume_liters"] == pytest.approx(7.92)
 
 
-def test_parse_packaging_50cl():
-    """24/5 = 24 bottles of 50cl."""
+def test_parse_packaging_20cl():
+    """24/5 = 24 bottles of 20cl (1/5 litre)."""
     result = parse_packaging_volume("PEPSI COLA 24/5")
     assert result is not None
     assert result["units"] == 24
-    assert result["cl_per_unit"] == 50
-    assert result["total_volume_liters"] == pytest.approx(12.0)
+    assert result["cl_per_unit"] == 20
+    assert result["total_volume_liters"] == pytest.approx(4.8)
 
 
 def test_parse_packaging_75cl():
@@ -147,12 +147,12 @@ def test_parse_packaging_explicit_format():
 
 
 def test_parse_packaging_spa():
-    """28/4 = 28 bottles of 40cl."""
+    """28/4 = 28 bottles of 25cl (1/4 litre)."""
     result = parse_packaging_volume("SPA BARISART 28/4")
     assert result is not None
     assert result["units"] == 28
-    assert result["cl_per_unit"] == 40
-    assert result["total_volume_liters"] == pytest.approx(11.2)
+    assert result["cl_per_unit"] == 25
+    assert result["total_volume_liters"] == pytest.approx(7.0)
 
 
 def test_parse_packaging_keg_ignored():

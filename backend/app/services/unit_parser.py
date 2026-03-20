@@ -18,11 +18,11 @@ BULK_KEYWORDS = ['fût', 'fut', 'bag in box', 'bib', 'vrac', 'citerne', 'cuve']
 
 # Mapping for single-digit Belgian brewery notation
 FRACTION_TO_CL: dict[int, int] = {
-    2: 25,   # /2 → 25cl (quart)
-    3: 33,   # /3 → 33cl (tiers)
-    4: 40,   # /4 → 40cl
-    5: 50,   # /5 → 50cl (demi)
-    7: 75,   # /7 → 75cl
+    2: 50,   # /2 → 1/2 litre = 50cl (demi)
+    3: 33,   # /3 → 1/3 litre = 33cl (tiers)
+    4: 25,   # /4 → 1/4 litre = 25cl (quart)
+    5: 20,   # /5 → 1/5 litre = 20cl
+    7: 75,   # /7 → 75cl (convention brasseurs belges)
 }
 
 
